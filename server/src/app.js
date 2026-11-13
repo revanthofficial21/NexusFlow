@@ -2,16 +2,27 @@
 const express = require("express");
 const cors = require("cors");
 
+const compilerRoutes = require("./routes/compilerRoutes");
+const pipelineRoutes = require("./routes/pipelineRoutes");
+
 const app = express();
 
 // Middleware
-app.use(cors({
-  origin: "http://localhost:5173",
-}));
+app.use(
+  cors({
+    origin: "http://localhost:5173",
+  })
+);
 
 app.use(express.json());
 
-// Health check
+// Compiler API
+app.use("/api/compiler", compilerRoutes);
+
+// Pipeline Management API
+app.use("/api/pipelines", pipelineRoutes);
+
+// Root route
 app.get("/", (req, res) => {
   res.status(200).json({
     success: true,
@@ -27,6 +38,7 @@ app.get("/api/health", (req, res) => {
     success: true,
     status: "healthy",
     service: "NexusFlow API",
+    database: "MongoDB Atlas",
   });
 });
 

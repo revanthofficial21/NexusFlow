@@ -394,3 +394,232 @@ body {
     min-height: 600px;
   }
 }
+
+.properties-panel {
+  margin-top: 24px;
+  padding: 14px;
+  background: #111827;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  color: #fff;
+}
+
+.properties-panel h3 {
+  font-size: 12px;
+  letter-spacing: 1px;
+  margin-bottom: 16px;
+}
+
+.properties-panel label {
+  display: block;
+  margin: 14px 0 7px;
+  font-size: 12px;
+  color: #cbd5e1;
+}
+
+.properties-panel input,
+.properties-panel select {
+  width: 100%;
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid #475569;
+  background: #1e293b;
+  color: white;
+  outline: none;
+}
+
+.properties-panel small,
+.properties-panel p {
+  display: block;
+  margin-top: 10px;
+  color: #94a3b8;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.save-message {
+  color: #22c55e;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px;
+}
+
+.canvas-toolbar button {
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid #475569;
+  background: #1e293b;
+  color: #ffffff;
+  font-size: 12px;
+}
+
+.canvas-toolbar button:hover {
+  background: #334155;
+}
+
+/* =====================================
+   MONGODB PIPELINE MANAGEMENT
+===================================== */
+
+.pipeline-manager {
+  margin: 20px 0;
+  padding: 20px;
+  background: #111827;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  color: #fff;
+}
+
+.pipeline-manager h3 {
+  margin-top: 0;
+  margin-bottom: 18px;
+  font-size: 14px;
+  letter-spacing: 1px;
+}
+
+.pipeline-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pipeline-form label {
+  color: #cbd5e1;
+  font-size: 12px;
+  margin-top: 5px;
+}
+
+.pipeline-form input,
+.pipeline-form select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 11px;
+  border: 1px solid #475569;
+  border-radius: 7px;
+  background: #1e293b;
+  color: #fff;
+  outline: none;
+  font-family: inherit;
+}
+
+.pipeline-form input:focus,
+.pipeline-form select:focus {
+  border-color: #7547f5;
+}
+
+.pipeline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.pipeline-actions button {
+  padding: 10px 14px;
+  border: 1px solid #475569;
+  border-radius: 7px;
+  background: #1e293b;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 500;
+  transition: 0.2s;
+}
+
+.pipeline-actions button:hover {
+  background: #334155;
+  border-color: #7547f5;
+}
+
+.pipeline-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pipeline-success {
+  color: #4ade80;
+  font-size: 13px;
+  margin-top: 12px;
+}
+
+.pipeline-error {
+  color: #f87171;
+  font-size: 13px;
+  margin-top: 12px;
+}
+
+.pipeline-count {
+  color: #94a3b8;
+  font-size: 12px;
+  margin-top: 15px;
+}
+
+/* =====================================
+   CANVAS TOOLBAR
+===================================== */
+
+.canvas-toolbar {
+  min-height: 43px;
+  padding: 8px 14px;
+  background: #e2e8f0;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  color: #334155;
+  font-size: 11px;
+}
+
+.canvas-toolbar button {
+  margin-left: auto;
+  border: 1px solid #cbd5e1;
+  background: white;
+  color: #334155;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.canvas-toolbar button:hover {
+  background: #f1f5f9;
+}
+
+/* ===== NexusFlow Heading Visibility Fix ===== */
+
+.topbar .brand h2 {
+  color: #f8fafc !important;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.topbar .brand p {
+  color: #94a3b8;
+}
+
+.page-heading h1 {
+  color: #f8fafc !important;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.page-heading p {
+  color: #94a3b8;
+}
+
+.pipeline-manager h3,
+.pipeline-info h3,
+.canvas-heading h3 {
+  color: #f8fafc;
+}
+
+.pipeline-manager label {
+  color: #cbd5e1;
+}
+
+.pipeline-success {
+  color: #4ade80;
+}
+
+.pipeline-error {
+  color: #f87171;
+}
