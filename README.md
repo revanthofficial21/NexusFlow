@@ -317,6 +317,18 @@ npm test              # from the repository root, or: cd server && npm test
 Covers graph validation (including cycles), the RxJS operators, and telemetry
 validation. CI runs the same suite plus a client build on every pull request.
 
+### End-to-end check
+
+With MongoDB configured and the server running in another terminal:
+
+```bash
+cd server && node scripts/smoke-test.js
+```
+
+Exercises ingestion, batch ingest, latest readings and the full pipeline CRUD
+cycle against the real database - the paths the unit tests deliberately avoid
+because they never touch MongoDB. Exits non-zero on any failure.
+
 ## Visual Rule Builder
 
 The initial pipeline demonstrates how different processing nodes can be connected.
