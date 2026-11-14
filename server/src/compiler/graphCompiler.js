@@ -38,9 +38,20 @@ function compileGraph(graph, sensorData$) {
   while (currentNode) {
     orderedNodes.push(currentNode);
 
-    const nextEdge = edges.find(
+    const outgoing = edges.filter(
       (edge) => edge.source === currentNode.id
     );
+
+    // This compiler executes a single chain. Failing loudly beats silently
+    // dropping a branch, which is what the old edges.find() did.
+    if (outgoing.length > 1) {
+      throw new Error(
+        `Node "${currentNode.id}" has ${outgoing.length} outgoing connections; ` +
+          "the compiler executes one chain per graph. Remove the extra branch."
+      );
+    }
+
+    const nextEdge = outgoing[0];
 
     if (!nextEdge) {
       break;
@@ -80,9 +91,11 @@ function compileGraph(graph, sensorData$) {
         );
 
         operators.push(
+          // startBufferEvery = 1 gives a sliding window. bufferCount also flushes
+          // the trailing partial windows when the source completes, and those
+          // must be dropped or the average is computed over too few samples.
           bufferCount(windowSize, 1),
 
-          // Ignore incomplete windows
           filter((values) => values.length === windowSize),
 
           // Calculate moving average
@@ -100,7 +113,19 @@ function compileGraph(graph, sensorData$) {
       }
 
       case "threshold": {
-        const threshold = Number(settings.threshold ?? 80);
+        // null/undefined/"" means "not configured" and falls back to 80. An
+        // explicit 0 is a real threshold and is kept.
+        const raw = settings.threshold;
+        const configured =
+          raw === null || raw === undefined || raw === "" ? 80 : Number(raw);
+
+        if (!Number.isFinite(configured)) {
+          throw new Error(
+            `Threshold value must be a number, received "${raw}"`
+          );
+        }
+
+        const threshold = configured;
         const operator = settings.operator || "greaterThan";
 
         operators.push(
@@ -112,8 +137,10 @@ function compileGraph(graph, sensorData$) {
               case "lessThan":
                 return value < threshold;
 
+              // Averages are floats: 20.333333333333332 === 20.333 is false, so
+              // exact equality would almost never fire.
               case "equal":
-                return value === threshold;
+                return Math.abs(value - threshold) < 1e-9;
 
               default:
                 throw new Error(

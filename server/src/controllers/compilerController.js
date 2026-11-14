@@ -13,7 +13,19 @@ async function executeGraph(req, res) {
       });
     }
 
-    const sensorData$ = of(...sensorData);
+    // Non numeric readings used to flow into the pipeline and produce NaN, which
+    // every threshold comparison silently rejects.
+    const readings = sensorData.map(Number);
+    const invalidIndex = readings.findIndex((value) => !Number.isFinite(value));
+
+    if (invalidIndex !== -1) {
+      return res.status(400).json({
+        success: false,
+        message: `sensorData[${invalidIndex}] is not a finite number`,
+      });
+    }
+
+    const sensorData$ = of(...readings);
 
     const compiledStream = compileGraph(
       graph,
@@ -27,7 +39,7 @@ async function executeGraph(req, res) {
     return res.status(200).json({
       success: true,
       message: "Graph executed successfully",
-      inputCount: sensorData.length,
+      inputCount: readings.length,
       outputCount: results.length,
       results,
     });

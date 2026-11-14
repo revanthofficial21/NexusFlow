@@ -1,7 +1,10 @@
 
 import axios from "axios";
 
-const API_URL = "http://localhost:5000/api/pipelines";
+const API_BASE =
+  import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+const API_URL = `${API_BASE}/api/pipelines`;
 
 // Save a new pipeline
 export const savePipeline = async (pipeline) => {

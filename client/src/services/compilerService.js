@@ -1,7 +1,10 @@
 
 import axios from "axios";
 
-const API_URL = "http://127.0.0.1:5000/api/compiler";
+const API_BASE =
+  import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+const API_URL = `${API_BASE}/api/compiler`;
 
 // Execute a visual graph through the backend
 export const executeGraph = async (nodes, edges, sensorData) => {

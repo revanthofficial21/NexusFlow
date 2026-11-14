@@ -290,8 +290,16 @@ export default function FlowCanvas({
 
   // Reset canvas to default graph
   const resetCanvas = () => {
-    setNodes(initialNodes);
-    setEdges(initialEdges);
+    // React Flow mutates the node objects it is given (selected, measured,
+    // position), so resetting with the module-level arrays restored stale state.
+    setNodes(
+      initialNodes.map((node) => ({
+        ...node,
+        position: { ...node.position },
+        data: { ...node.data },
+      }))
+    );
+    setEdges(initialEdges.map((edge) => ({ ...edge })));
     setSelectedNodeId(null);
   };
 
@@ -397,13 +405,17 @@ export default function FlowCanvas({
 
               <input
                 type="number"
-                value={selectedNode.data.threshold ?? 105}
-                onChange={(event) =>
+                value={selectedNode.data.threshold ?? ""}
+                onChange={(event) => {
+                  const raw = event.target.value;
+
+                  // Clearing the field used to store Number("") === 0, which
+                  // turned the rule into "alert on everything positive".
                   updateNodeData(
                     "threshold",
-                    Number(event.target.value)
-                  )
-                }
+                    raw === "" ? null : Number(raw)
+                  );
+                }}
               />
 
               <small>

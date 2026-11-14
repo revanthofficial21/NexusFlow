@@ -1,5 +1,6 @@
 
 const Pipeline = require("../models/Pipeline");
+const { validateGraph } = require("../compiler/validateGraph");
 
 // CREATE: Save a new pipeline
 const createPipeline = async (req, res) => {
@@ -17,6 +18,17 @@ const createPipeline = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "Nodes and edges must be arrays",
+      });
+    }
+
+    // Saving an unvalidated graph only defers the failure to /api/compiler/execute.
+    const validation = validateGraph({ nodes, edges });
+
+    if (!validation.valid) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid pipeline graph",
+        errors: validation.errors,
       });
     }
 
@@ -122,6 +134,21 @@ const updatePipeline = async (req, res) => {
         });
       }
       updates.edges = edges;
+    }
+
+    if (updates.nodes || updates.edges) {
+      const validation = validateGraph({
+        nodes: updates.nodes ?? [],
+        edges: updates.edges ?? [],
+      });
+
+      if (!validation.valid) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid pipeline graph",
+          errors: validation.errors,
+        });
+      }
     }
 
     const pipeline = await Pipeline.findByIdAndUpdate(

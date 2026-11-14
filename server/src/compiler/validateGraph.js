@@ -70,10 +70,45 @@ function validateGraph(graph) {
     }
   });
 
+  // A cycle is a validation failure, not something the compiler should discover
+  // halfway through building a pipeline.
+  if (errors.length === 0 && hasCycle(nodes, edges)) {
+    errors.push("Graph contains a cycle; connections must form a DAG");
+  }
+
   return {
     valid: errors.length === 0,
     errors,
   };
+}
+
+function hasCycle(nodes, edges) {
+  const outgoing = new Map(nodes.map((node) => [node.id, []]));
+
+  edges.forEach((edge) => {
+    if (outgoing.has(edge.source)) {
+      outgoing.get(edge.source).push(edge.target);
+    }
+  });
+
+  const state = new Map(); // undefined = unvisited, 1 = in stack, 2 = done
+
+  const visit = (id) => {
+    const current = state.get(id) || 0;
+    if (current === 1) return true;
+    if (current === 2) return false;
+
+    state.set(id, 1);
+
+    for (const next of outgoing.get(id) || []) {
+      if (visit(next)) return true;
+    }
+
+    state.set(id, 2);
+    return false;
+  };
+
+  return nodes.some((node) => visit(node.id));
 }
 
 module.exports = { validateGraph };
