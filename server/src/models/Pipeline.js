@@ -16,15 +16,15 @@ const pipelineSchema = new mongoose.Schema(
       maxlength: 500,
     },
 
+    // `required: true` on an array with a default can never fail, so it was
+    // misleading. Shape validation happens in the controller via validateGraph.
     nodes: {
       type: [mongoose.Schema.Types.Mixed],
-      required: true,
       default: [],
     },
 
     edges: {
       type: [mongoose.Schema.Types.Mixed],
-      required: true,
       default: [],
     },
   },
@@ -32,6 +32,9 @@ const pipelineSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
+// Every list endpoint sorts by updatedAt.
+pipelineSchema.index({ updatedAt: -1 });
 
 const Pipeline = mongoose.model("Pipeline", pipelineSchema);
 

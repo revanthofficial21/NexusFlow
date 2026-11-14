@@ -265,11 +265,57 @@ npm run dev
 http://localhost:5173/
 ```
 
+### 7. Set up the backend
+
+In a second terminal:
+
+```bash
+cd server
+cp .env.example .env      # set MONGODB_URI
+npm install
+npm run dev
+```
+
+The API listens on `http://localhost:5000`. On boot it connects to MongoDB and
+creates the `telemetry` time-series collection if it does not exist, so there is no
+manual database step.
+
+Point the client at it by copying `client/.env.example` to `client/.env`.
+
 ## Running the Application
 
-The frontend currently runs independently using the Vite development server.
+Two processes: the Vite dev server on port 5173 and the Express API on port 5000.
 
-The backend and MongoDB integration will be configured in upcoming development phases.
+```bash
+# terminal 1
+cd server && npm run dev
+
+# terminal 2
+cd client && npm run dev
+```
+
+### API surface
+
+| Method | Route | Purpose |
+| --- | --- | --- |
+| GET | `/api/health` | Liveness plus MongoDB connection state |
+| POST | `/api/telemetry/ingest` | Ingest a single reading |
+| POST | `/api/telemetry/batch` | Ingest up to 2000 readings |
+| GET | `/api/telemetry/latest` | Latest readings, optionally by device |
+| POST | `/api/compiler/execute` | Compile and run a graph against sample readings |
+| GET/POST/PUT/DELETE | `/api/pipelines` | Saved pipeline CRUD |
+
+`GET /api/health` returns `503` when MongoDB is disconnected, so it is safe to use
+as a real health check.
+
+### Tests
+
+```bash
+npm test              # from the repository root, or: cd server && npm test
+```
+
+Covers graph validation (including cycles), the RxJS operators, and telemetry
+validation. CI runs the same suite plus a client build on every pull request.
 
 ## Visual Rule Builder
 

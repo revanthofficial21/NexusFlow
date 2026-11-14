@@ -1,13 +1,11 @@
 
 const express = require("express");
 const cors = require("cors");
+const mongoose = require("mongoose");
 
 const compilerRoutes = require("./routes/compilerRoutes");
 const pipelineRoutes = require("./routes/pipelineRoutes");
-// Telemetry ingestion lives in the flat server/ tree. Mounting it here is the
-// minimal fix for "the ingest endpoint 404s on the running app"; the follow-up is
-// to move the controller under src/ and delete the duplicate entry point.
-const telemetryRoutes = require("../routes/telemetryRoutes");
+const telemetryRoutes = require("./routes/telemetryRoutes");
 
 const app = express();
 
@@ -24,7 +22,8 @@ const allowedOrigins = (
 
 app.use(cors({ origin: allowedOrigins }));
 
-app.use(express.json());
+// Batch telemetry bodies exceed the 100kb default.
+app.use(express.json({ limit: "5mb" }));
 
 // Telemetry ingestion
 app.use("/api/telemetry", telemetryRoutes);
@@ -55,7 +54,6 @@ const CONNECTION_STATES = {
 };
 
 app.get("/api/health", (req, res) => {
-  const mongoose = require("mongoose");
   const state = mongoose.connection.readyState;
   const healthy = state === 1;
 

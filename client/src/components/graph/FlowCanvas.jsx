@@ -72,6 +72,17 @@ function AlertNode({ data }) {
   );
 }
 
+// React Flow mutates the node objects it is given (selected, measured, position),
+// so the module-level arrays must never be handed to it directly.
+const cloneNodes = (list) =>
+  list.map((node) => ({
+    ...node,
+    position: { ...node.position },
+    data: { ...node.data },
+  }));
+
+const cloneEdges = (list) => list.map((edge) => ({ ...edge }));
+
 const nodeTypes = {
   sensor: SensorNode,
   average: MovingAverageNode,
@@ -162,11 +173,13 @@ export default function FlowCanvas({
   onGraphChange,
   initialGraph,
 }) {
-  const [nodes, setNodes, onNodesChange] =
-    useNodesState(initialGraph?.nodes ?? initialNodes);
+  const [nodes, setNodes, onNodesChange] = useNodesState(
+    cloneNodes(initialGraph?.nodes ?? initialNodes)
+  );
 
-  const [edges, setEdges, onEdgesChange] =
-    useEdgesState(initialGraph?.edges ?? initialEdges);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(
+    cloneEdges(initialGraph?.edges ?? initialEdges)
+  );
 
   const [selectedNodeId, setSelectedNodeId] = useState(null);
 
@@ -182,12 +195,24 @@ export default function FlowCanvas({
   // Connect nodes
   const onConnect = useCallback(
     (connection) => {
-      setEdges((currentEdges) =>
-        addEdge(
+      // A node cannot feed itself, and the same wire twice is a mistake, not a
+      // feature. Both were accepted and only rejected later by the backend.
+      if (connection.source === connection.target) return;
+
+      setEdges((currentEdges) => {
+        const duplicate = currentEdges.some(
+          (edge) =>
+            edge.source === connection.source &&
+            edge.target === connection.target
+        );
+
+        if (duplicate) return currentEdges;
+
+        return addEdge(
           { ...connection, animated: true },
           currentEdges
-        )
-      );
+        );
+      });
     },
     [setEdges]
   );
@@ -290,16 +315,8 @@ export default function FlowCanvas({
 
   // Reset canvas to default graph
   const resetCanvas = () => {
-    // React Flow mutates the node objects it is given (selected, measured,
-    // position), so resetting with the module-level arrays restored stale state.
-    setNodes(
-      initialNodes.map((node) => ({
-        ...node,
-        position: { ...node.position },
-        data: { ...node.data },
-      }))
-    );
-    setEdges(initialEdges.map((edge) => ({ ...edge })));
+    setNodes(cloneNodes(initialNodes));
+    setEdges(cloneEdges(initialEdges));
     setSelectedNodeId(null);
   };
 

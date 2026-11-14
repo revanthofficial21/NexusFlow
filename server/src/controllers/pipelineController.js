@@ -2,6 +2,26 @@
 const Pipeline = require("../models/Pipeline");
 const { validateGraph } = require("../compiler/validateGraph");
 
+/**
+ * Mongoose validation and cast failures are the caller's fault (400). Everything
+ * else is ours (500) and must not leak internal messages to the client.
+ */
+function handleError(res, error, fallbackMessage) {
+  if (error.name === "ValidationError" || error.name === "CastError") {
+    return res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+
+  console.error(`${fallbackMessage}:`, error.message);
+
+  return res.status(500).json({
+    success: false,
+    message: fallbackMessage,
+  });
+}
+
 // CREATE: Save a new pipeline
 const createPipeline = async (req, res) => {
   try {
@@ -45,10 +65,7 @@ const createPipeline = async (req, res) => {
       pipeline,
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+    return handleError(res, error, "Unable to save pipeline");
   }
 };
 
@@ -64,10 +81,7 @@ const getPipelines = async (req, res) => {
       pipelines,
     });
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+    return handleError(res, error, "Unable to retrieve pipelines");
   }
 };
 
@@ -88,10 +102,15 @@ const getPipelineById = async (req, res) => {
       pipeline,
     });
   } catch (error) {
-    return res.status(400).json({
-      success: false,
-      message: "Invalid pipeline ID",
-    });
+    // Only a malformed ObjectId is the caller's fault; a dropped connection is not.
+    if (error.name === "CastError") {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid pipeline ID",
+      });
+    }
+
+    return handleError(res, error, "Unable to retrieve pipeline");
   }
 };
 
@@ -173,10 +192,7 @@ const updatePipeline = async (req, res) => {
       pipeline,
     });
   } catch (error) {
-    return res.status(400).json({
-      success: false,
-      message: error.message,
-    });
+    return handleError(res, error, "Unable to update pipeline");
   }
 };
 
@@ -199,10 +215,14 @@ const deletePipeline = async (req, res) => {
       message: "Pipeline deleted successfully",
     });
   } catch (error) {
-    return res.status(400).json({
-      success: false,
-      message: "Invalid pipeline ID",
-    });
+    if (error.name === "CastError") {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid pipeline ID",
+      });
+    }
+
+    return handleError(res, error, "Unable to delete pipeline");
   }
 };
 

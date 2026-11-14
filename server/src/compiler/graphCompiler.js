@@ -72,6 +72,20 @@ function compileGraph(graph, sensorData$) {
     currentNode = nextNode;
   }
 
+  // Step 3b: every node has to be part of the chain that starts at the sensor,
+  // otherwise it silently does nothing.
+  const unreachable = nodes.filter(
+    (node) => !orderedNodes.some((ordered) => ordered.id === node.id)
+  );
+
+  if (unreachable.length > 0) {
+    throw new Error(
+      `Graph contains nodes not connected to the sensor chain: ${unreachable
+        .map((node) => node.id)
+        .join(", ")}`
+    );
+  }
+
   // Step 4: Build RxJS operators
   const operators = [];
 
@@ -128,27 +142,25 @@ function compileGraph(graph, sensorData$) {
         const threshold = configured;
         const operator = settings.operator || "greaterThan";
 
-        operators.push(
-          filter((value) => {
-            switch (operator) {
-              case "greaterThan":
-                return value > threshold;
+        // Averages are floats: 20.333333333333332 === 20.333 is false, so exact
+        // equality would almost never fire.
+        const comparators = {
+          greaterThan: (value) => value > threshold,
+          lessThan: (value) => value < threshold,
+          equal: (value) => Math.abs(value - threshold) < 1e-9,
+        };
 
-              case "lessThan":
-                return value < threshold;
+        const compare = comparators[operator];
 
-              // Averages are floats: 20.333333333333332 === 20.333 is false, so
-              // exact equality would almost never fire.
-              case "equal":
-                return Math.abs(value - threshold) < 1e-9;
+        // Validated while compiling: an unknown operator used to throw inside the
+        // filter callback, once per value.
+        if (!compare) {
+          throw new Error(
+            `Unsupported threshold operator: ${operator}`
+          );
+        }
 
-              default:
-                throw new Error(
-                  `Unsupported threshold operator: ${operator}`
-                );
-            }
-          })
-        );
+        operators.push(filter((value) => compare(value)));
 
         break;
       }
@@ -172,9 +184,11 @@ function compileGraph(graph, sensorData$) {
   }
 
   // Step 5: Connect the input stream
-  const source = sensorData$ || of();
+  if (!sensorData$ || typeof sensorData$.subscribe !== "function") {
+    throw new Error("A sensorData$ stream is required");
+  }
 
-  return source.pipe(...operators);
+  return sensorData$.pipe(...operators);
 }
 
 module.exports = { compileGraph };

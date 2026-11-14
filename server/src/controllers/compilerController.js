@@ -2,6 +2,9 @@
 const { of, lastValueFrom, toArray } = require("rxjs");
 const { compileGraph } = require("../compiler/graphCompiler");
 
+// Guards against one request pinning the event loop.
+const MAX_SENSOR_DATA = 10000;
+
 async function executeGraph(req, res) {
   try {
     const { graph, sensorData } = req.body;
@@ -10,6 +13,13 @@ async function executeGraph(req, res) {
       return res.status(400).json({
         success: false,
         message: "Graph and sensorData array are required",
+      });
+    }
+
+    if (sensorData.length > MAX_SENSOR_DATA) {
+      return res.status(413).json({
+        success: false,
+        message: `sensorData exceeds the limit of ${MAX_SENSOR_DATA} readings`,
       });
     }
 
@@ -44,9 +54,18 @@ async function executeGraph(req, res) {
       results,
     });
   } catch (error) {
-    return res.status(400).json({
+    // Graph problems are the caller's fault (400); anything else is ours (500).
+    const isClientError = /^(Invalid graph|Graph must|Node |Threshold value|Unsupported|sensorData)/.test(
+      error.message
+    );
+
+    if (!isClientError) {
+      console.error("Compiler error:", error.message);
+    }
+
+    return res.status(isClientError ? 400 : 500).json({
       success: false,
-      message: error.message,
+      message: isClientError ? error.message : "Graph execution failed",
     });
   }
 }
