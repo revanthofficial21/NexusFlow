@@ -1,4 +1,3 @@
-
 import { useCallback } from "react";
 import {
   ReactFlow,
@@ -30,6 +29,17 @@ function SensorNode({ data }) {
       <div>🌡️ Data Source</div>
       <small>{data.label}</small>
       <p>{data.value}</p>
+    </div>
+  );
+}
+
+function AverageNode({ data }) {
+  return (
+    <div style={{ ...nodeStyle, background: "#0f766e" }}>
+      <Handle type="target" position={Position.Left} />
+      <Handle type="source" position={Position.Right} />
+      <div>📈 Average</div>
+      <small>{data.label}</small>
     </div>
   );
 }
@@ -67,11 +77,23 @@ function AlertNode({ data }) {
   );
 }
 
+function WebhookNode({ data }) {
+  return (
+    <div style={{ ...nodeStyle, background: "#9333ea" }}>
+      <Handle type="target" position={Position.Left} />
+      <div>🔗 Webhook</div>
+      <small>{data.label}</small>
+    </div>
+  );
+}
+
 const nodeTypes = {
   sensor: SensorNode,
-  average: MovingAverageNode,
+  average: AverageNode,
+  movingAverage: MovingAverageNode,
   threshold: ThresholdNode,
   alert: AlertNode,
+  webhook: WebhookNode,
 };
 
 const initialNodes = [
@@ -86,7 +108,7 @@ const initialNodes = [
   },
   {
     id: "2",
-    type: "average",
+    type: "movingAverage",
     position: { x: 310, y: 150 },
     data: { label: "Window: 5 samples" },
   },
@@ -123,6 +145,13 @@ const library = [
   },
   {
     type: "average",
+    name: "Average",
+    description: "Calculate average values",
+    icon: "📈",
+    color: "#0f766e",
+  },
+  {
+    type: "movingAverage",
     name: "Moving Average",
     description: "Calculate rolling average",
     icon: "📊",
@@ -142,7 +171,45 @@ const library = [
     icon: "🚨",
     color: "#be123c",
   },
+  {
+    type: "webhook",
+    name: "Webhook",
+    description: "Send HTTP notifications",
+    icon: "🔗",
+    color: "#9333ea",
+  },
 ];
+
+function getNodeData(type) {
+  switch (type) {
+    case "sensor":
+      return {
+        label: "New Sensor",
+        value: "Temperature: 25°C",
+      };
+
+    case "average":
+      return { label: "Calculate Average" };
+
+    case "movingAverage":
+      return { label: "Window: 5 samples" };
+
+    case "threshold":
+      return {
+        label: "New Condition",
+        condition: "Greater than 80°C",
+      };
+
+    case "alert":
+      return { label: "New Notification" };
+
+    case "webhook":
+      return { label: "New Webhook Action" };
+
+    default:
+      return { label: "New Node" };
+  }
+}
 
 export default function FlowCanvas() {
   const [nodes, setNodes, onNodesChange] =
@@ -173,32 +240,16 @@ export default function FlowCanvas() {
         id,
         type: item.type,
         position: {
-          x: 100 + (nodes.length % 3) * 80,
-          y: 350 + Math.floor(nodes.length / 3) * 100,
+          x: 100 + (nodes.length % 3) * 100,
+          y: 350 + Math.floor(nodes.length / 3) * 120,
         },
-        data: {
-          label:
-            item.type === "sensor"
-              ? "New Sensor"
-              : item.type === "average"
-              ? "Window: 5 samples"
-              : item.type === "threshold"
-              ? "New Condition"
-              : "New Notification",
-
-          value:
-            item.type === "sensor"
-              ? "Temperature: 25°C"
-              : undefined,
-
-          condition:
-            item.type === "threshold"
-              ? "Greater than 80°C"
-              : undefined,
-        },
+        data: getNodeData(item.type),
       };
 
-      setNodes((currentNodes) => [...currentNodes, newNode]);
+      setNodes((currentNodes) => [
+        ...currentNodes,
+        newNode,
+      ]);
     },
     [nodes.length, setNodes]
   );
@@ -214,9 +265,13 @@ export default function FlowCanvas() {
             key={item.type}
             className="library-node"
             onClick={() => addNode(item)}
-            style={{ borderLeft: `4px solid ${item.color}` }}
+            style={{
+              borderLeft: `4px solid ${item.color}`,
+            }}
           >
-            <span className="library-icon">{item.icon}</span>
+            <span className="library-icon">
+              {item.icon}
+            </span>
 
             <span className="library-details">
               <strong>{item.name}</strong>
@@ -240,6 +295,7 @@ export default function FlowCanvas() {
         <div className="canvas-toolbar">
           <span>{nodes.length} Nodes</span>
           <span>{edges.length} Connections</span>
+
           <button
             onClick={() => {
               setNodes(initialNodes);
