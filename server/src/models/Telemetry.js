@@ -32,6 +32,13 @@ const telemetrySchema = new mongoose.Schema(
       granularity: "seconds",
     },
     expireAfterSeconds: RETENTION_SECONDS,
+    // Creation is handled explicitly by config/timeseries.js. Leaving autoCreate
+    // on let Mongoose race it and fail the boot with NamespaceExists.
+    autoCreate: false,
+    // A time-series collection needs no secondary index: Mongo orders it by time
+    // and indexes metaField itself. Disabling the ensure step avoids a pointless
+    // round trip on first use.
+    autoIndex: false,
     versionKey: false,
   }
 );

@@ -187,9 +187,13 @@ export default function FlowCanvas({
     (node) => node.id === selectedNodeId
   );
 
-  // Send graph data to App.jsx
+  // Send graph data to App.jsx. React Flow emits a change per mouse move while
+  // dragging, and each one used to re-render the whole app, so the notify is
+  // debounced until the graph settles.
   useEffect(() => {
-    onGraphChange?.(nodes, edges);
+    const timer = setTimeout(() => onGraphChange?.(nodes, edges), 120);
+
+    return () => clearTimeout(timer);
   }, [nodes, edges, onGraphChange]);
 
   // Connect nodes

@@ -1,12 +1,20 @@
 
 const Pipeline = require("../models/Pipeline");
 const { validateGraph } = require("../compiler/validateGraph");
+const {
+  isDatabaseUnavailable,
+  respondDatabaseUnavailable,
+} = require("../utils/dbError");
 
 /**
  * Mongoose validation and cast failures are the caller's fault (400). Everything
  * else is ours (500) and must not leak internal messages to the client.
  */
 function handleError(res, error, fallbackMessage) {
+  if (isDatabaseUnavailable(error)) {
+    return respondDatabaseUnavailable(res);
+  }
+
   if (error.name === "ValidationError" || error.name === "CastError") {
     return res.status(400).json({
       success: false,
@@ -153,6 +161,14 @@ const updatePipeline = async (req, res) => {
         });
       }
       updates.edges = edges;
+    }
+
+    // An empty body used to return 200 and change nothing, which reads as success.
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No updatable fields provided",
+      });
     }
 
     // A partial update (only nodes, or only edges) has to be validated against

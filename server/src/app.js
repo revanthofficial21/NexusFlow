@@ -7,6 +7,11 @@ const compilerRoutes = require("./routes/compilerRoutes");
 const pipelineRoutes = require("./routes/pipelineRoutes");
 const telemetryRoutes = require("./routes/telemetryRoutes");
 
+// Applies to every model, including when the app is mounted without a database
+// (tests). Set here rather than only on connect(), because a model created before
+// the connection exists would otherwise fall back to the 10s buffer timeout.
+mongoose.set("bufferCommands", false);
+
 const app = express();
 
 // Middleware

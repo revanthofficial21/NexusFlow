@@ -1,4 +1,8 @@
 const Telemetry = require("../models/Telemetry");
+const {
+  isDatabaseUnavailable,
+  respondDatabaseUnavailable,
+} = require("../utils/dbError");
 
 const MAX_BATCH = Number(process.env.INGEST_BATCH_LIMIT || 2000);
 
@@ -84,6 +88,10 @@ async function receiveTelemetry(req, res) {
       insertedId: saved._id,
     });
   } catch (error) {
+    if (isDatabaseUnavailable(error)) {
+      return respondDatabaseUnavailable(res);
+    }
+
     console.error("Telemetry error:", error.message);
 
     return res.status(500).json({
@@ -144,6 +152,10 @@ async function receiveTelemetryBatch(req, res) {
       insertedCount: result.insertedCount,
     });
   } catch (error) {
+    if (isDatabaseUnavailable(error)) {
+      return respondDatabaseUnavailable(res);
+    }
+
     console.error("Telemetry batch error:", error.message);
 
     return res.status(500).json({
@@ -172,6 +184,10 @@ async function getLatestTelemetry(req, res) {
 
     return res.status(200).json({ success: true, count: records.length, records });
   } catch (error) {
+    if (isDatabaseUnavailable(error)) {
+      return respondDatabaseUnavailable(res);
+    }
+
     console.error("Telemetry read error:", error.message);
 
     return res.status(500).json({

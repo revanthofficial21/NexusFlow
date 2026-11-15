@@ -21,7 +21,24 @@ async function ensureTelemetryCollection() {
     .toArray();
 
   if (existing.length > 0) {
-    return { created: false };
+    // The TTL is fixed at creation time, so changing TELEMETRY_RETENTION_DAYS used
+    // to be silently ignored on every later boot.
+    const current = existing[0].options?.expireAfterSeconds;
+
+    if (current !== RETENTION_SECONDS) {
+      await db.command({
+        collMod: "telemetry",
+        expireAfterSeconds: RETENTION_SECONDS,
+      });
+
+      console.log(
+        `[db] retention updated ${current} -> ${RETENTION_SECONDS}s`
+      );
+
+      return { created: false, retentionUpdated: true };
+    }
+
+    return { created: false, retentionUpdated: false };
   }
 
   await db.createCollection("telemetry", {

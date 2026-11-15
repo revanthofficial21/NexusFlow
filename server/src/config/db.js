@@ -12,7 +12,12 @@ const connectDB = async () => {
   }
 
   try {
-    await mongoose.connect(mongoURI);
+    await mongoose.connect(mongoURI, {
+      // Without this a request waits the full 10s buffer timeout when Mongo is
+      // unreachable, instead of failing immediately.
+      bufferCommands: false,
+      serverSelectionTimeoutMS: 5000,
+    });
   } catch (error) {
     throw new Error(`MongoDB connection failed: ${error.message}`);
   }

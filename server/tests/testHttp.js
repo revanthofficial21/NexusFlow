@@ -122,6 +122,81 @@ const server = app.listen(0, async () => {
     assert.match(body.message, /Invalid pipeline graph/);
     console.log("Test 8 passed: an invalid graph is rejected before saving");
 
+    // 8. A valid request with the database down fails fast with 503, instead of
+    // parking for the 10s mongoose buffer timeout.
+    const startedAt = Date.now();
+    res = await fetch(`${base}/api/telemetry/ingest`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        deviceId: "sensor-001",
+        deviceType: "temperature",
+        temperature: 20,
+      }),
+    });
+    body = await res.json();
+    const elapsed = Date.now() - startedAt;
+
+    assert.strictEqual(res.status, 503);
+    assert.strictEqual(body.message, "Database unavailable");
+    assert.ok(elapsed < 2000, `expected a fast failure, took ${elapsed}ms`);
+    console.log(`Test 9 passed: ingest fails fast with 503 when the DB is down (${elapsed}ms)`);
+
+    res = await fetch(`${base}/api/pipelines`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        name: "valid",
+        nodes: [
+          { id: "1", type: "sensor", data: {} },
+          { id: "2", type: "alert", data: {} },
+        ],
+        edges: [{ id: "a", source: "1", target: "2" }],
+      }),
+    });
+
+    assert.strictEqual(res.status, 503);
+    console.log("Test 10 passed: pipeline save returns 503 when the DB is down");
+
+    // 9. The compiler needs no database, so it keeps working.
+    res = await fetch(`${base}/api/compiler/execute`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        graph: {
+          nodes: [
+            { id: "1", type: "sensor", data: {} },
+            { id: "2", type: "average", data: { windowSize: 2 } },
+            { id: "3", type: "threshold", data: { threshold: 80, operator: "greaterThan" } },
+            { id: "4", type: "alert", data: {} },
+          ],
+          edges: [
+            { id: "a", source: "1", target: "2" },
+            { id: "b", source: "2", target: "3" },
+            { id: "c", source: "3", target: "4" },
+          ],
+        },
+        sensorData: [90, 100, 110, 120],
+      }),
+    });
+    body = await res.json();
+
+    assert.strictEqual(res.status, 200);
+    assert.deepStrictEqual(body.results, [95, 105, 115]);
+    console.log("Test 11 passed: the compiler still runs without a database");
+
+    // 10. An update with nothing to update is a client error, not a success.
+    res = await fetch(`${base}/api/pipelines/507f1f77bcf86cd799439011`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    body = await res.json();
+
+    assert.strictEqual(res.status, 400);
+    assert.match(body.message, /No updatable fields/);
+    console.log("Test 12 passed: an empty update is rejected");
+
     console.log("\nAll HTTP tests passed!");
   } catch (error) {
     console.error("HTTP test failed:", error.message);
