@@ -54,18 +54,16 @@ async function executeGraph(req, res) {
       results,
     });
   } catch (error) {
-    // Graph problems are the caller's fault (400); anything else is ours (500).
-    const isClientError = /^(Invalid graph|Graph must|Node |Threshold value|Unsupported|sensorData)/.test(
-      error.message
-    );
+    // The compiler tags graph problems with status 400; anything untagged is ours.
+    const status = error.status || 500;
 
-    if (!isClientError) {
+    if (status >= 500) {
       console.error("Compiler error:", error.message);
     }
 
-    return res.status(isClientError ? 400 : 500).json({
+    return res.status(status).json({
       success: false,
-      message: isClientError ? error.message : "Graph execution failed",
+      message: status >= 500 ? "Graph execution failed" : error.message,
     });
   }
 }

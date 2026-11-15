@@ -155,10 +155,22 @@ const updatePipeline = async (req, res) => {
       updates.edges = edges;
     }
 
-    if (updates.nodes || updates.edges) {
+    // A partial update (only nodes, or only edges) has to be validated against
+    // what is already stored, not against an empty array - otherwise every
+    // single-field update was rejected with "node has no input".
+    if (updates.nodes !== undefined || updates.edges !== undefined) {
+      const existing = await Pipeline.findById(req.params.id).lean();
+
+      if (!existing) {
+        return res.status(404).json({
+          success: false,
+          message: "Pipeline not found",
+        });
+      }
+
       const validation = validateGraph({
-        nodes: updates.nodes ?? [],
-        edges: updates.edges ?? [],
+        nodes: updates.nodes ?? existing.nodes,
+        edges: updates.edges ?? existing.edges,
       });
 
       if (!validation.valid) {

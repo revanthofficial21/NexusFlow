@@ -73,4 +73,37 @@ app.use((req, res) => {
   });
 });
 
+/**
+ * JSON error handler. Must be registered last and take four arguments.
+ *
+ * Without this, a malformed request body was answered by Express's default
+ * handler with an HTML page containing a stack trace - unparseable for the client
+ * and a leak of internal paths.
+ */
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  if (err.type === "entity.parse.failed" || err instanceof SyntaxError) {
+    return res.status(400).json({
+      success: false,
+      message: "Malformed JSON body",
+    });
+  }
+
+  if (err.type === "entity.too.large") {
+    return res.status(413).json({
+      success: false,
+      message: "Request body too large",
+    });
+  }
+
+  console.error("Unhandled error:", err.message);
+
+  const status = err.status || err.statusCode || 500;
+
+  return res.status(status).json({
+    success: false,
+    message: status >= 500 ? "Internal server error" : err.message,
+  });
+});
+
 module.exports = app;

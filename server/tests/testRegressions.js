@@ -116,7 +116,19 @@ const floatEqual = {
 assert.strictEqual(run(floatEqual, [10, 20, 31]).length, 1);
 console.log("Test 8 passed: equal matches a float average");
 
-// 9. The compiler needs a real stream ---------------------------------------
+// 9. An absurd window size is rejected instead of buffering forever ----------
+const hugeWindow = {
+  nodes: [node("1", "sensor"), node("2", "average", { windowSize: 50000000 }), node("3", "alert")],
+  edges: chain(node("1", "sensor"), node("2", "average"), node("3", "alert")),
+};
+
+expectThrow(
+  () => run(hugeWindow, [1, 2, 3]),
+  /Window size must be between 1 and 1000/,
+  "an unbounded window size is rejected"
+);
+
+// 10. The compiler needs a real stream --------------------------------------
 expectThrow(
   () => compileGraph(cleared),
   /sensorData\$ stream is required/,
@@ -140,6 +152,15 @@ const noReadings = validatePoint({ deviceId: "sensor-001", deviceType: "temperat
 assert.ok(noReadings.errors.some((e) => /at least one/.test(e)));
 console.log("Test 12 passed: a point with no readings is rejected");
 
+const badLocation = validatePoint({
+  deviceId: "sensor-001",
+  deviceType: "temperature",
+  location: 42,
+  temperature: 20,
+});
+assert.ok(badLocation.errors.some((e) => /location must be a string/.test(e)));
+console.log("Test 13 passed: a non string location is rejected");
+
 const goodPoint = validatePoint({
   deviceId: "sensor-001",
   deviceType: "temperature",
@@ -151,6 +172,6 @@ assert.deepStrictEqual(goodPoint.errors, []);
 assert.strictEqual(goodPoint.point.readings.temperature, 28.5);
 assert.strictEqual(goodPoint.point.metadata.location, "Room-1");
 assert.ok(goodPoint.point.timestamp instanceof Date);
-console.log("Test 13 passed: a valid point is normalised into a document");
+console.log("Test 14 passed: a valid point is normalised into a document");
 
 console.log("\nAll regression tests passed!");

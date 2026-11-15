@@ -9,12 +9,24 @@ const {
 
 const { validateGraph } = require("./validateGraph");
 
+const MAX_WINDOW = 1000;
+
+/**
+ * Graph problems are the caller's fault, so they carry status 400 and the
+ * controller can answer with it directly instead of pattern-matching messages.
+ */
+function graphError(message) {
+  const error = new Error(message);
+  error.status = 400;
+  return error;
+}
+
 function compileGraph(graph, sensorData$) {
   // Step 1: Validate the graph
   const validation = validateGraph(graph);
 
   if (!validation.valid) {
-    throw new Error(
+    throw graphError(
       `Invalid graph: ${validation.errors.join(", ")}`
     );
   }
@@ -28,7 +40,7 @@ function compileGraph(graph, sensorData$) {
   );
 
   if (!sensorNode) {
-    throw new Error("Graph must contain a sensor node");
+    throw graphError("Graph must contain a sensor node");
   }
 
   // Step 3: Follow graph connections
@@ -45,7 +57,7 @@ function compileGraph(graph, sensorData$) {
     // This compiler executes a single chain. Failing loudly beats silently
     // dropping a branch, which is what the old edges.find() did.
     if (outgoing.length > 1) {
-      throw new Error(
+      throw graphError(
         `Node "${currentNode.id}" has ${outgoing.length} outgoing connections; ` +
           "the compiler executes one chain per graph. Remove the extra branch."
       );
@@ -66,7 +78,7 @@ function compileGraph(graph, sensorData$) {
     }
 
     if (orderedNodes.some((node) => node.id === nextNode.id)) {
-      throw new Error("Cycle detected in graph");
+      throw graphError("Cycle detected in graph");
     }
 
     currentNode = nextNode;
@@ -79,7 +91,7 @@ function compileGraph(graph, sensorData$) {
   );
 
   if (unreachable.length > 0) {
-    throw new Error(
+    throw graphError(
       `Graph contains nodes not connected to the sensor chain: ${unreachable
         .map((node) => node.id)
         .join(", ")}`
@@ -99,10 +111,18 @@ function compileGraph(graph, sensorData$) {
       }
 
       case "average": {
-        const windowSize = Math.max(
-          1,
-          Number(settings.windowSize) || 5
-        );
+        const rawWindow = Number(settings.windowSize);
+        const windowSize = Number.isFinite(rawWindow)
+          ? Math.trunc(rawWindow)
+          : 5;
+
+        // Uncapped, a window of 50,000,000 buffers the whole stream in memory and
+        // never emits.
+        if (windowSize < 1 || windowSize > MAX_WINDOW) {
+          throw graphError(
+            `Window size must be between 1 and ${MAX_WINDOW}, received "${settings.windowSize}"`
+          );
+        }
 
         operators.push(
           // startBufferEvery = 1 gives a sliding window. bufferCount also flushes
@@ -134,7 +154,7 @@ function compileGraph(graph, sensorData$) {
           raw === null || raw === undefined || raw === "" ? 80 : Number(raw);
 
         if (!Number.isFinite(configured)) {
-          throw new Error(
+          throw graphError(
             `Threshold value must be a number, received "${raw}"`
           );
         }
@@ -155,7 +175,7 @@ function compileGraph(graph, sensorData$) {
         // Validated while compiling: an unknown operator used to throw inside the
         // filter callback, once per value.
         if (!compare) {
-          throw new Error(
+          throw graphError(
             `Unsupported threshold operator: ${operator}`
           );
         }
@@ -176,7 +196,7 @@ function compileGraph(graph, sensorData$) {
       }
 
       default: {
-        throw new Error(
+        throw graphError(
           `Unsupported node type: ${node.type}`
         );
       }
@@ -185,7 +205,7 @@ function compileGraph(graph, sensorData$) {
 
   // Step 5: Connect the input stream
   if (!sensorData$ || typeof sensorData$.subscribe !== "function") {
-    throw new Error("A sensorData$ stream is required");
+    throw graphError("A sensorData$ stream is required");
   }
 
   return sensorData$.pipe(...operators);

@@ -242,7 +242,13 @@ function App() {
 
       await deletePipeline(selectedPipelineId);
 
+      // The canvas still showed the deleted pipeline, and the next save silently
+      // created a new one from that stale graph.
       setSelectedPipelineId("");
+      setCanvasInitialGraph(null);
+      setCanvasKey((current) => current + 1);
+      setGraph({ nodes: [], edges: [] });
+      setExecutionResult(null);
       setPipelineMessage("Pipeline deleted successfully!");
 
       await fetchSavedPipelines();

@@ -24,6 +24,10 @@ function validatePoint(input) {
     errors.push("deviceType is required and must be a string");
   }
 
+  if (location !== undefined && location !== null && typeof location !== "string") {
+    errors.push("location must be a string");
+  }
+
   const readings = {};
 
   for (const [field, value] of Object.entries({ temperature, humidity })) {
@@ -150,7 +154,13 @@ async function receiveTelemetryBatch(req, res) {
 }
 
 async function getLatestTelemetry(req, res) {
-  const limit = Math.min(Number(req.query.limit) || 50, 500);
+  // A negative or fractional limit used to reach the driver, which rejected it
+  // and turned a bad query into a 500.
+  const requested = Number(req.query.limit);
+  const limit = Number.isFinite(requested)
+    ? Math.min(Math.max(Math.trunc(requested), 1), 500)
+    : 50;
+
   const deviceId = req.query.deviceId;
 
   try {
