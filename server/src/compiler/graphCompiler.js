@@ -49,8 +49,13 @@ function graphError(message) {
   return error;
 }
 
-function compileGraph(graph, sensorData$) {
-  // Step 1: Validate the graph
+/**
+ * Validates the graph and resolves the single chain that runs from the sensor to
+ * its action node. Shared by compileGraph (which builds the pipeline) and
+ * describeGraph (which only reports the plan), so parsing and executing cannot
+ * disagree about what a graph means.
+ */
+function analyseGraph(graph) {
   const validation = validateGraph(graph);
 
   if (!validation.valid) {
@@ -62,7 +67,6 @@ function compileGraph(graph, sensorData$) {
   const nodes = graph.nodes;
   const edges = graph.edges;
 
-  // Step 2: Find the starting sensor node
   const sensorNode = nodes.find(
     (node) => node.type === "sensor"
   );
@@ -71,7 +75,6 @@ function compileGraph(graph, sensorData$) {
     throw graphError("Graph must contain a sensor node");
   }
 
-  // Step 3: Follow graph connections
   const orderedNodes = [];
   let currentNode = sensorNode;
 
@@ -125,6 +128,54 @@ function compileGraph(graph, sensorData$) {
         .join(", ")}`
     );
   }
+
+  return { nodes, edges, sensorNode, orderedNodes };
+}
+
+/**
+ * Parses a graph without executing it: the same validation and chain resolution
+ * compileGraph performs, reported as data. Backs POST /api/compiler/parse, so the
+ * mid-project review can show parsing and execution as separate steps.
+ */
+function describeGraph(graph) {
+  const { orderedNodes } = analyseGraph(graph);
+
+  const plan = orderedNodes.map((node) => {
+    const settings = node.data || {};
+
+    switch (node.type) {
+      case "sensor":
+        return { id: node.id, type: node.type, deviceId: settings.deviceId ?? null };
+
+      case "average":
+        return { id: node.id, type: node.type, windowSize: settings.windowSize ?? 5 };
+
+      case "threshold":
+        return {
+          id: node.id,
+          type: node.type,
+          operator: settings.operator ?? "greaterThan",
+          threshold: settings.threshold ?? 80,
+        };
+
+      case "webhook":
+        return { id: node.id, type: node.type, url: settings.url ?? null, method: settings.method ?? "POST" };
+
+      default:
+        return { id: node.id, type: node.type };
+    }
+  });
+
+  return {
+    valid: true,
+    nodeCount: plan.length,
+    executionOrder: plan.map((step) => step.id),
+    plan,
+  };
+}
+
+function compileGraph(graph, sensorData$) {
+  const { orderedNodes } = analyseGraph(graph);
 
   // Step 4: Build RxJS operators
   const operators = [];
@@ -271,4 +322,4 @@ function compileGraph(graph, sensorData$) {
   return sensorData$.pipe(...operators);
 }
 
-module.exports = { compileGraph };
+module.exports = { compileGraph, describeGraph, analyseGraph };

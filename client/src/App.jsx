@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import FlowCanvas from "./components/graph/FlowCanvas";
 import { executeGraph } from "./services/compilerService";
+import { serializeGraph } from "./services/graphService";
 
 import {
   savePipeline,
@@ -105,11 +106,14 @@ function App() {
       setPipelineError("");
       setPipelineMessage("");
 
+      // Strip React Flow bookkeeping before it reaches the database.
+      const serialized = serializeGraph(graph.nodes, graph.edges);
+
       const result = await savePipeline({
         name: pipelineName.trim(),
         description: pipelineDescription,
-        nodes: graph.nodes,
-        edges: graph.edges,
+        nodes: serialized.nodes,
+        edges: serialized.edges,
       });
 
       setPipelineMessage("Pipeline saved successfully!");
@@ -201,11 +205,13 @@ function App() {
       setPipelineError("");
       setPipelineMessage("");
 
+      const serialized = serializeGraph(graph.nodes, graph.edges);
+
       await updatePipeline(selectedPipelineId, {
         name: pipelineName.trim(),
         description: pipelineDescription,
-        nodes: graph.nodes,
-        edges: graph.edges,
+        nodes: serialized.nodes,
+        edges: serialized.edges,
       });
 
       setPipelineMessage("Pipeline updated successfully!");
@@ -278,9 +284,11 @@ function App() {
     const sensorData = [90, 100, 110, 120];
 
     try {
+      const serialized = serializeGraph(graph.nodes, graph.edges);
+
       const result = await executeGraph(
-        graph.nodes,
-        graph.edges,
+        serialized.nodes,
+        serialized.edges,
         sensorData
       );
 

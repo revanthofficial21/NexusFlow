@@ -112,6 +112,7 @@ const initialNodes = [
     data: {
       label: "Turbine Sensor",
       value: "Temperature: 85°C",
+      deviceId: "turbine-01",
     },
   },
   {
@@ -311,6 +312,8 @@ export default function FlowCanvas({
               ? "Temperature: 25°C"
               : undefined,
 
+          deviceId: item.type === "sensor" ? "turbine-01" : undefined,
+
           windowSize:
             item.type === "average" ? 3 : undefined,
 
@@ -506,8 +509,26 @@ export default function FlowCanvas({
             </>
           )}
 
-          {(selectedNode?.type === "sensor" ||
-            selectedNode?.type === "alert") && (
+          {selectedNode?.type === "sensor" && (
+            <>
+              <label>Device ID</label>
+
+              <input
+                type="text"
+                value={selectedNode.data.deviceId ?? ""}
+                placeholder="turbine-01"
+                onChange={(event) =>
+                  updateNodeData("deviceId", event.target.value)
+                }
+              />
+
+              <small>
+                Live pipelines only react to telemetry from this device.
+              </small>
+            </>
+          )}
+
+          {selectedNode?.type === "alert" && (
             <p>
               Properties for this node will be configurable
               in a later step.

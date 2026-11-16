@@ -302,6 +302,7 @@ cd client && npm run dev
 | POST | `/api/telemetry/ingest` | Ingest a single reading |
 | POST | `/api/telemetry/batch` | Ingest up to 2000 readings |
 | GET | `/api/telemetry/latest` | Latest readings, optionally by device |
+| POST | `/api/compiler/parse` | Validate a graph and report the execution plan, without running it |
 | POST | `/api/compiler/execute` | Compile and run a graph against sample readings |
 | GET/POST/PUT/DELETE | `/api/pipelines` | Saved pipeline CRUD |
 
@@ -316,6 +317,24 @@ npm test              # from the repository root, or: cd server && npm test
 
 Covers graph validation (including cycles), the RxJS operators, and telemetry
 validation. CI runs the same suite plus a client build on every pull request.
+
+### Ingestion benchmark
+
+```bash
+cd server && npm run bench        # 5,000 writes/sec for 10s
+RATE=10000 DURATION=20 npm run bench
+```
+
+Reports achieved writes/sec and p50/p95 batch latency, and exits non-zero if the
+target is missed. Read the storage footprint separately with `db.telemetry.stats()`
+in mongosh.
+
+### Live pipelines
+
+Saving a pipeline compiles it immediately: ingestion publishes each stored point
+onto one shared RxJS subject, and every saved rule subscribes to the readings for
+its sensor node's `deviceId`. Rules are recompiled at boot from MongoDB, so they
+survive a restart. `GET /api/pipelines` reports `running` per pipeline.
 
 ### End-to-end check
 

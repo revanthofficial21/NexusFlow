@@ -5,6 +5,7 @@ const {
   isDatabaseUnavailable,
   respondDatabaseUnavailable,
 } = require("../utils/dbError");
+const { getRegistry } = require("../streams/ruleRegistry");
 
 /**
  * Mongoose validation and cast failures are the caller's fault (400). Everything
@@ -67,10 +68,14 @@ const createPipeline = async (req, res) => {
       edges,
     });
 
+    // Compiled before responding, so "saved" also means "running".
+    const status = getRegistry().compile(pipeline.toObject());
+
     return res.status(201).json({
       success: true,
       message: "Pipeline saved successfully",
       pipeline,
+      status,
     });
   } catch (error) {
     return handleError(res, error, "Unable to save pipeline");
@@ -81,12 +86,18 @@ const createPipeline = async (req, res) => {
 const getPipelines = async (req, res) => {
   try {
     const pipelines = await Pipeline.find()
-      .sort({ updatedAt: -1 });
+      .sort({ updatedAt: -1 })
+      .lean();
+
+    const registry = getRegistry();
 
     return res.status(200).json({
       success: true,
       count: pipelines.length,
-      pipelines,
+      pipelines: pipelines.map((pipeline) => ({
+        ...pipeline,
+        running: registry.status(pipeline._id).running,
+      })),
     });
   } catch (error) {
     return handleError(res, error, "Unable to retrieve pipelines");
@@ -214,10 +225,13 @@ const updatePipeline = async (req, res) => {
       });
     }
 
+    const status = getRegistry().compile(pipeline.toObject());
+
     return res.status(200).json({
       success: true,
       message: "Pipeline updated successfully",
       pipeline,
+      status,
     });
   } catch (error) {
     return handleError(res, error, "Unable to update pipeline");
@@ -237,6 +251,8 @@ const deletePipeline = async (req, res) => {
         message: "Pipeline not found",
       });
     }
+
+    getRegistry().stop(req.params.id);
 
     return res.status(200).json({
       success: true,

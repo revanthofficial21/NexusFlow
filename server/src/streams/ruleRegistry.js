@@ -1,0 +1,129 @@
+const { filter, map } = require("rxjs");
+const { compileGraph, analyseGraph } = require("../compiler/graphCompiler");
+const { telemetryStream } = require("./telemetryBus");
+
+/**
+ * Live pipelines: one subscription per saved rule, fed by the telemetry bus.
+ *
+ * This is the piece that turns the compiler from a per-request dry run into a
+ * running engine. compileGraph itself is unchanged - it receives the bus as its
+ * source instead of a fixed array.
+ */
+
+/**
+ * The readings a rule should see: one device, numeric temperature only.
+ * Exported so it can be tested without a database.
+ */
+function liveSourceFor(bus, deviceId) {
+  return bus.asObservable().pipe(
+    filter((point) => !deviceId || point?.metadata?.deviceId === deviceId),
+    filter((point) => typeof point?.readings?.temperature === "number"),
+    map((point) => point.readings.temperature)
+  );
+}
+
+class RuleRegistry {
+  constructor({ bus, logger = console } = {}) {
+    this.bus = bus || { asObservable: telemetryStream };
+    this.logger = logger;
+    this.pipelines = new Map();
+  }
+
+  /** Compiles one saved pipeline document, replacing any previous subscription. */
+  compile(document) {
+    const id = String(document._id || document.id);
+    const graph = { nodes: document.nodes || [], edges: document.edges || [] };
+
+    this.stop(id);
+
+    try {
+      const { sensorNode } = analyseGraph(graph);
+      const deviceId = sensorNode?.data?.deviceId || null;
+
+      const subscription = compileGraph(
+        graph,
+        liveSourceFor(this.bus, deviceId)
+      ).subscribe({
+        error: (error) =>
+          this.logger.error(`[registry] pipeline ${id} failed: ${error.message}`),
+      });
+
+      this.pipelines.set(id, {
+        subscription,
+        deviceId,
+        name: document.name,
+        compiledAt: new Date().toISOString(),
+      });
+
+      this.logger.log(
+        `[registry] compiled "${document.name}" (device: ${deviceId || "any"})`
+      );
+
+      return this.status(id);
+    } catch (error) {
+      this.logger.warn(`[registry] ${document.name} not compiled: ${error.message}`);
+
+      return { id, running: false, error: error.message };
+    }
+  }
+
+  stop(id) {
+    const entry = this.pipelines.get(String(id));
+
+    if (!entry) return false;
+
+    entry.subscription.unsubscribe();
+    this.pipelines.delete(String(id));
+
+    return true;
+  }
+
+  stopAll() {
+    for (const id of [...this.pipelines.keys()]) this.stop(id);
+  }
+
+  status(id) {
+    const entry = this.pipelines.get(String(id));
+
+    if (!entry) return { id: String(id), running: false };
+
+    return {
+      id: String(id),
+      running: true,
+      name: entry.name,
+      deviceId: entry.deviceId,
+      compiledAt: entry.compiledAt,
+    };
+  }
+
+  statuses() {
+    return [...this.pipelines.keys()].map((id) => this.status(id));
+  }
+
+  /** Compiles every stored pipeline. Called once at boot. */
+  async bootstrap(Pipeline) {
+    const documents = await Pipeline.find().lean();
+
+    const results = documents.map((document) => this.compile(document));
+    const running = results.filter((result) => result.running).length;
+
+    this.logger.log(
+      `[registry] ${running}/${documents.length} saved pipeline(s) running`
+    );
+
+    return { total: documents.length, running };
+  }
+}
+
+let instance = null;
+
+/**
+ * The process-wide registry. Controllers compile on save and stop on delete
+ * through this, so a saved rule is live without a restart.
+ */
+function getRegistry() {
+  if (!instance) instance = new RuleRegistry();
+  return instance;
+}
+
+module.exports = { RuleRegistry, liveSourceFor, getRegistry };

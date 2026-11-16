@@ -1,4 +1,5 @@
 const Telemetry = require("../models/Telemetry");
+const { publishTelemetry } = require("../streams/telemetryBus");
 const {
   isDatabaseUnavailable,
   respondDatabaseUnavailable,
@@ -82,6 +83,10 @@ async function receiveTelemetry(req, res) {
   try {
     const saved = await Telemetry.create(point);
 
+    // Stored first, then published: a rule should not fire for a point that
+    // never made it into the database.
+    publishTelemetry(point);
+
     return res.status(201).json({
       success: true,
       message: "Telemetry received successfully",
@@ -145,6 +150,8 @@ async function receiveTelemetryBatch(req, res) {
     const result = await Telemetry.collection.insertMany(documents, {
       ordered: false,
     });
+
+    documents.forEach(publishTelemetry);
 
     return res.status(201).json({
       success: true,

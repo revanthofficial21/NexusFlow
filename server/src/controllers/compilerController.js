@@ -1,6 +1,6 @@
 
 const { of, lastValueFrom, toArray } = require("rxjs");
-const { compileGraph } = require("../compiler/graphCompiler");
+const { compileGraph, describeGraph } = require("../compiler/graphCompiler");
 
 // Guards against one request pinning the event loop.
 const MAX_SENSOR_DATA = 10000;
@@ -68,4 +68,28 @@ async function executeGraph(req, res) {
   }
 }
 
-module.exports = { executeGraph };
+/**
+ * Parse-only: validates the graph and reports the execution plan without running
+ * anything. Lets the mid-project review show parsing as its own step.
+ */
+function parseGraphRequest(req, res) {
+  const graph = req.body?.graph ?? req.body;
+
+  try {
+    const description = describeGraph(graph);
+    return res.status(200).json({ success: true, ...description });
+  } catch (error) {
+    const status = error.status || 500;
+
+    if (status >= 500) {
+      console.error("Graph parse error:", error.message);
+    }
+
+    return res.status(status).json({
+      success: false,
+      message: status >= 500 ? "Graph could not be parsed" : error.message,
+    });
+  }
+}
+
+module.exports = { executeGraph, parseGraphRequest };

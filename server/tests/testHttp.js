@@ -197,6 +197,45 @@ const server = app.listen(0, async () => {
     assert.match(body.message, /No updatable fields/);
     console.log("Test 12 passed: an empty update is rejected");
 
+    // 11. Parse-only endpoint: reports the plan without executing.
+    res = await fetch(`${base}/api/compiler/parse`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        graph: {
+          nodes: [
+            { id: "1", type: "sensor", data: { deviceId: "turbine-01" } },
+            { id: "2", type: "average", data: { windowSize: 3 } },
+            { id: "3", type: "threshold", data: { threshold: 105, operator: "greaterThan" } },
+            { id: "4", type: "alert", data: {} },
+          ],
+          edges: [
+            { id: "a", source: "1", target: "2" },
+            { id: "b", source: "2", target: "3" },
+            { id: "c", source: "3", target: "4" },
+          ],
+        },
+      }),
+    });
+    body = await res.json();
+
+    assert.strictEqual(res.status, 200);
+    assert.deepStrictEqual(body.executionOrder, ["1", "2", "3", "4"]);
+    assert.strictEqual(body.plan[0].deviceId, "turbine-01");
+    assert.strictEqual(body.plan[2].threshold, 105);
+    console.log("Test 13 passed: /api/compiler/parse reports the plan without executing");
+
+    res = await fetch(`${base}/api/compiler/parse`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        graph: { nodes: [{ id: "1", type: "nope" }], edges: [] },
+      }),
+    });
+
+    assert.strictEqual(res.status, 400);
+    console.log("Test 14 passed: parse rejects an invalid graph with 400");
+
     console.log("\nAll HTTP tests passed!");
   } catch (error) {
     console.error("HTTP test failed:", error.message);
