@@ -353,6 +353,12 @@ Represents a condition that compares an incoming value against a configured thre
 
 Represents a notification action that will be triggered when the configured condition is satisfied.
 
+**Webhook**
+
+POSTs (or PUTs/PATCHes) the matched value as JSON to a URL you configure. Delivery
+is fire-and-forget with a 3 second timeout: a failing endpoint is logged and never
+stops the pipeline.
+
 ## Example IoT Pipeline
 
 A sample turbine temperature monitoring workflow:

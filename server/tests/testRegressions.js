@@ -128,7 +128,42 @@ expectThrow(
   "an unbounded window size is rejected"
 );
 
-// 10. The compiler needs a real stream --------------------------------------
+// 10. Webhook action node -----------------------------------------------------
+const webhookGraph = (data) => ({
+  nodes: [node("1", "sensor"), node("2", "webhook", data)],
+  edges: chain(node("1", "sensor"), node("2", "webhook")),
+});
+
+assert.strictEqual(
+  validateGraph({
+    nodes: [node("1", "sensor"), node("2", "webhook", { url: "https://example.com/hook" })],
+    edges: [{ id: "a", source: "1", target: "2" }],
+  }).valid,
+  true
+);
+console.log("Test 15 passed: the validator accepts a webhook node");
+
+expectThrow(
+  () => run(webhookGraph({ url: "" }), [1]),
+  /needs an http\(s\) URL/,
+  "webhook without a URL is rejected"
+);
+
+expectThrow(
+  () => run(webhookGraph({ url: "https://example.com/hook", method: "DELETE" }), [1]),
+  /Webhook method must be one of/,
+  "unsupported webhook method is rejected"
+);
+
+// Delivery is fire-and-forget: the stream must not block or break when the
+// endpoint is unreachable.
+assert.deepStrictEqual(
+  run(webhookGraph({ url: "http://127.0.0.1:9/hook" }), [10, 20]),
+  [10, 20]
+);
+console.log("Test 16 passed: an unreachable webhook does not break the stream");
+
+// 11. The compiler needs a real stream --------------------------------------
 expectThrow(
   () => compileGraph(cleared),
   /sensorData\$ stream is required/,

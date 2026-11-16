@@ -4,6 +4,7 @@ const SUPPORTED_NODE_TYPES = [
   "average",
   "threshold",
   "alert",
+  "webhook",
 ];
 
 function validateGraph(graph) {

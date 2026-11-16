@@ -10,6 +10,34 @@ const {
 const { validateGraph } = require("./validateGraph");
 
 const MAX_WINDOW = 1000;
+const WEBHOOK_TIMEOUT_MS = 3000;
+const WEBHOOK_METHODS = ["POST", "PUT", "PATCH"];
+
+/**
+ * Fire-and-forget delivery. A failing webhook must never break the pipeline, so
+ * every failure is logged and swallowed.
+ */
+async function deliverWebhook(url, method, payload) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), WEBHOOK_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(url, {
+      method,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      console.warn(`[webhook] ${url} responded ${response.status}`);
+    }
+  } catch (error) {
+    console.warn(`[webhook] ${url} failed: ${error.message}`);
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 /**
  * Graph problems are the caller's fault, so they carry status 400 and the
@@ -181,6 +209,38 @@ function compileGraph(graph, sensorData$) {
         }
 
         operators.push(filter((value) => compare(value)));
+
+        break;
+      }
+
+      case "webhook": {
+        const url = String(settings.url || "").trim();
+
+        if (!/^https?:\/\//i.test(url)) {
+          throw graphError(
+            `Webhook node ${node.id} needs an http(s) URL, received "${settings.url ?? ""}"`
+          );
+        }
+
+        const method = String(settings.method || "POST").toUpperCase();
+
+        if (!WEBHOOK_METHODS.includes(method)) {
+          throw graphError(
+            `Webhook method must be one of ${WEBHOOK_METHODS.join(", ")}, received "${settings.method}"`
+          );
+        }
+
+        // tap, not mergeMap: the stream keeps flowing at sensor speed while the
+        // HTTP call happens in the background.
+        operators.push(
+          tap((value) => {
+            void deliverWebhook(url, method, {
+              node: node.id,
+              value,
+              at: new Date().toISOString(),
+            });
+          })
+        );
 
         break;
       }

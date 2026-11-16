@@ -61,6 +61,18 @@ function ThresholdNode({ data }) {
   );
 }
 
+// Webhook Node
+function WebhookNode({ data }) {
+  return (
+    <div style={{ ...nodeStyle, background: "#9333ea" }}>
+      <Handle type="target" position={Position.Left} />
+      <div>🔗 Webhook</div>
+      <small>{data.label}</small>
+      <p>{data.url}</p>
+    </div>
+  );
+}
+
 // Alert Node
 function AlertNode({ data }) {
   return (
@@ -88,6 +100,7 @@ const nodeTypes = {
   average: MovingAverageNode,
   threshold: ThresholdNode,
   alert: AlertNode,
+  webhook: WebhookNode,
 };
 
 // Initial graph
@@ -166,6 +179,13 @@ const library = [
     description: "Trigger notifications",
     icon: "🚨",
     color: "#be123c",
+  },
+  {
+    type: "webhook",
+    name: "Webhook",
+    description: "POST the value to a URL",
+    icon: "🔗",
+    color: "#9333ea",
   },
 ];
 
@@ -282,6 +302,8 @@ export default function FlowCanvas({
               ? "Window: 3 samples"
               : item.type === "threshold"
               ? "New Condition"
+              : item.type === "webhook"
+              ? "New Webhook"
               : "New Notification",
 
           value:
@@ -304,6 +326,13 @@ export default function FlowCanvas({
             item.type === "threshold"
               ? "Greater than 105°C"
               : undefined,
+
+          url:
+            item.type === "webhook"
+              ? "https://example.com/hook"
+              : undefined,
+
+          method: item.type === "webhook" ? "POST" : undefined,
         },
       };
 
@@ -441,6 +470,38 @@ export default function FlowCanvas({
 
               <small>
                 Values are compared against this threshold.
+              </small>
+            </>
+          )}
+
+          {selectedNode?.type === "webhook" && (
+            <>
+              <label>Webhook URL</label>
+
+              <input
+                type="url"
+                value={selectedNode.data.url ?? ""}
+                placeholder="https://example.com/hook"
+                onChange={(event) =>
+                  updateNodeData("url", event.target.value)
+                }
+              />
+
+              <label>Method</label>
+
+              <select
+                value={selectedNode.data.method || "POST"}
+                onChange={(event) =>
+                  updateNodeData("method", event.target.value)
+                }
+              >
+                <option value="POST">POST</option>
+                <option value="PUT">PUT</option>
+                <option value="PATCH">PATCH</option>
+              </select>
+
+              <small>
+                The matched value is sent as JSON when the rule fires.
               </small>
             </>
           )}
