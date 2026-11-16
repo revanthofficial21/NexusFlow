@@ -1,47 +1,190 @@
+﻿
+const mongoose = require("mongoose");
 
-const connectDB = require("../db");
-
+// 1. Receive and store sensor telemetry
 async function receiveTelemetry(req, res) {
   try {
-    const db = await connectDB();
-
     const { deviceId, deviceType, location, temperature, humidity } = req.body;
 
-    if (!deviceId || !deviceType) {
+    if (
+      typeof deviceId !== "string" || !deviceId.trim() ||
+      typeof deviceType !== "string" || !deviceType.trim()
+    ) {
       return res.status(400).json({
         success: false,
-        message: "deviceId and deviceType are required",
+        message: "Valid deviceId and deviceType are required",
       });
     }
+
+    if (
+      (temperature !== undefined &&
+        (typeof temperature !== "number" || !Number.isFinite(temperature))) ||
+      (humidity !== undefined &&
+        (typeof humidity !== "number" || !Number.isFinite(humidity)))
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Temperature and humidity must be valid numbers",
+      });
+    }
+
+    if (temperature === undefined && humidity === undefined) {
+      return res.status(400).json({
+        success: false,
+        message: "At least one sensor reading is required",
+      });
+    }
+
+    const db = mongoose.connection.db;
 
     const sensorData = {
       timestamp: new Date(),
       metadata: {
-        deviceId,
-        deviceType,
+        deviceId: deviceId.trim(),
+        deviceType: deviceType.trim(),
         location: location || "Unknown",
       },
-      readings: {
-        temperature,
-        humidity,
-      },
+      readings: { temperature, humidity },
     };
 
     const result = await db.collection("telemetry").insertOne(sensorData);
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       message: "Telemetry received successfully",
       insertedId: result.insertedId,
+      data: sensorData,
     });
   } catch (error) {
     console.error("Telemetry error:", error.message);
-
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "Failed to save telemetry",
     });
   }
 }
 
-module.exports = { receiveTelemetry };
+// 2. Fetch latest telemetry with device and date filters
+async function getLatestTelemetry(req, res) {
+  try {
+    const db = mongoose.connection.db;
+    const limit = Math.min(
+      Math.max(parseInt(req.query.limit, 10) || 10, 1),
+      100
+    );
+
+    const filter = {};
+    const { deviceId, startDate, endDate } = req.query;
+
+    if (deviceId) {
+      filter["metadata.deviceId"] = deviceId;
+    }
+
+    if (startDate || endDate) {
+      filter.timestamp = {};
+
+      if (startDate) {
+        const start = new Date(startDate);
+
+        if (Number.isNaN(start.getTime())) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid startDate",
+          });
+        }
+
+        filter.timestamp.$gte = start;
+      }
+
+      if (endDate) {
+        const end = new Date(endDate);
+
+        if (Number.isNaN(end.getTime())) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid endDate",
+          });
+        }
+
+        filter.timestamp.$lte = end;
+      }
+
+      if (
+        startDate &&
+        endDate &&
+        new Date(startDate) > new Date(endDate)
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "startDate must be before endDate",
+        });
+      }
+    }
+
+    const records = await db.collection("telemetry")
+      .find(filter)
+      .sort({ timestamp: -1 })
+      .limit(limit)
+      .toArray();
+
+    return res.status(200).json({
+      success: true,
+      count: records.length,
+      filters: {
+        deviceId: deviceId || null,
+        startDate: startDate || null,
+        endDate: endDate || null,
+      },
+      data: records,
+    });
+  } catch (error) {
+    console.error("Telemetry read error:", error.message);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch telemetry",
+    });
+  }
+}
+
+// 3. Get device-wise telemetry statistics
+async function getTelemetryStats(req, res) {
+  try {
+    const db = mongoose.connection.db;
+
+    const stats = await db.collection("telemetry").aggregate([
+      { $sort: { timestamp: -1 } },
+      {
+        $group: {
+          _id: "$metadata.deviceId",
+          deviceType: { $first: "$metadata.deviceType" },
+          location: { $first: "$metadata.location" },
+          totalReadings: { $sum: 1 },
+          avgTemperature: { $avg: "$readings.temperature" },
+          maxTemperature: { $max: "$readings.temperature" },
+          avgHumidity: { $avg: "$readings.humidity" },
+          maxHumidity: { $max: "$readings.humidity" },
+          latestTimestamp: { $first: "$timestamp" },
+        },
+      },
+      { $sort: { latestTimestamp: -1 } },
+    ]).toArray();
+
+    return res.status(200).json({
+      success: true,
+      deviceCount: stats.length,
+      data: stats,
+    });
+  } catch (error) {
+    console.error("Telemetry statistics error:", error.message);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch telemetry statistics",
+    });
+  }
+}
+
+module.exports = {
+  receiveTelemetry,
+  getLatestTelemetry,
+  getTelemetryStats,
+};

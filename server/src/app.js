@@ -1,28 +1,19 @@
-
-const express = require("express");
+﻿const express = require("express");
 const cors = require("cors");
 
 const compilerRoutes = require("./routes/compilerRoutes");
 const pipelineRoutes = require("./routes/pipelineRoutes");
+const telemetryRoutes = require("../routes/telemetryRoutes");
 
 const app = express();
 
-// Middleware
-app.use(
-  cors({
-    origin: "http://localhost:5173",
-  })
-);
-
+app.use(cors({ origin: "http://localhost:5173" }));
 app.use(express.json());
 
-// Compiler API
 app.use("/api/compiler", compilerRoutes);
-
-// Pipeline Management API
 app.use("/api/pipelines", pipelineRoutes);
+app.use("/api/telemetry", telemetryRoutes);
 
-// Root route
 app.get("/", (req, res) => {
   res.status(200).json({
     success: true,
@@ -32,7 +23,6 @@ app.get("/", (req, res) => {
   });
 });
 
-// API health route
 app.get("/api/health", (req, res) => {
   res.status(200).json({
     success: true,
@@ -42,7 +32,6 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-// Unknown route handler
 app.use((req, res) => {
   res.status(404).json({
     success: false,

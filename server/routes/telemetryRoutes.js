@@ -1,9 +1,14 @@
-
-const express = require("express");
+﻿const express = require("express");
 const router = express.Router();
 
-const { receiveTelemetry } = require("../controllers/telemetryController");
+const {
+  receiveTelemetry,
+  getLatestTelemetry,
+  getTelemetryStats
+} = require("../controllers/telemetryController");
 
 router.post("/ingest", receiveTelemetry);
+router.get("/latest", getLatestTelemetry);
+router.get("/stats", getTelemetryStats);
 
-module.exports = router
+module.exports = router;
