@@ -6,6 +6,7 @@ import { executeGraph } from "./services/compilerService";
 import { serializeGraph } from "./services/graphService";
 import { useAlerts } from "./hooks/useAlerts";
 import { useTelemetry } from "./hooks/useTelemetry";
+import { useEdgeActivity } from "./hooks/useEdgeActivity";
 import TelemetryChart from "./components/TelemetryChart";
 
 import {
@@ -57,6 +58,9 @@ function App() {
   const { points: livePoints, connected: telemetryConnected } = useTelemetry({
     deviceId: chartDevice,
   });
+
+  // Which wires are carrying data, for the canvas glow.
+  const { activeEdges } = useEdgeActivity();
 
   // Receive graph updates from FlowCanvas
   const handleGraphChange = useCallback((nodes, edges) => {
@@ -577,6 +581,7 @@ function App() {
               key={canvasKey}
               initialGraph={canvasInitialGraph}
               onGraphChange={handleGraphChange}
+              activeEdges={activeEdges}
             />
           </section>
 

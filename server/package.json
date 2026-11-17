@@ -7,7 +7,7 @@
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
     "bench": "node scripts/benchmarkIngestion.js",
-    "test": "node tests/testValidator.js && node tests/testCompiler.js && node tests/testRegressions.js && node tests/testHttp.js && node tests/testSerializer.js && node tests/testLivePipeline.js && node tests/testAlerts.js && node tests/testSocket.js"
+    "test": "node tests/testValidator.js && node tests/testCompiler.js && node tests/testRegressions.js && node tests/testHttp.js && node tests/testSerializer.js && node tests/testLivePipeline.js && node tests/testAlerts.js && node tests/testSocket.js && node tests/testEdgeActivity.js"
   },
   "keywords": [],
   "author": "",

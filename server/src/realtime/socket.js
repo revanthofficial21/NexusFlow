@@ -32,6 +32,9 @@ function initSocket(httpServer, { origin }) {
         timestamp: document.timestamp,
       });
     },
+    broadcastEdgeActivity(activity) {
+      io.emit("edge:activity", activity);
+    },
     broadcastAlert(alert) {
       // Alerts go to everyone: a manager watching one device still needs to know
       // a rule fired elsewhere.

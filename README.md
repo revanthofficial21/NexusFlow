@@ -348,6 +348,17 @@ above the threshold would write an alert per point.
 The dashboard shows a live chart for one device: the server broadcasts each stored
 point into a `device:<id>` room and the client's `useTelemetry` hook joins it.
 
+Edge activity: as a value crosses a node, the compiler reports the wire it left, so
+the canvas can light that connection up. Events are capped at one per wire per
+`EDGE_ACTIVITY_INTERVAL_MS` (default 100ms) - without the cap a 5,000 writes/sec
+stream would emit 5,000 socket messages per second per wire.
+
+### CI
+
+Three jobs: server tests, client build, and an e2e job that starts a `mongo:7`
+service container, boots the API against it, runs `scripts/smoke-test.js` and
+records an ingestion benchmark at a reduced rate.
+
 ### Socket.IO
 
 The API and the socket server share port 5000.
@@ -358,6 +369,7 @@ The API and the socket server share port 5000.
 | client to server | `unsubscribe:device` | `{ deviceId }` |
 | server to client | `telemetry` | `{ deviceId, metric, value, timestamp }` for that device only |
 | server to client | `alert` | the recorded alert document, broadcast to everyone |
+| server to client | `edge:activity` | `{ ruleId, edgeId, nodeId }`, rate-limited per wire |
 
 ### Alerts
 

@@ -2,8 +2,12 @@ const { filter, map } = require("rxjs");
 const { compileGraph, analyseGraph } = require("../compiler/graphCompiler");
 const { telemetryStream } = require("./telemetryBus");
 const { createAlertThrottle } = require("./alertThrottle");
+const { createActivityGate } = require("./activityGate");
 
 const ALERT_COOLDOWN_MS = Number(process.env.ALERT_COOLDOWN_MS || 30000);
+const EDGE_ACTIVITY_INTERVAL_MS = Number(
+  process.env.EDGE_ACTIVITY_INTERVAL_MS || 100
+);
 
 /**
  * Live pipelines: one subscription per saved rule, fed by the telemetry bus.
@@ -31,11 +35,20 @@ class RuleRegistry {
     this.logger = logger;
     this.pipelines = new Map();
     this.alertHandler = null;
+    this.edgeHandler = null;
+    this.activityGate = createActivityGate({
+      minIntervalMs: EDGE_ACTIVITY_INTERVAL_MS,
+    });
   }
 
   /** Wired at boot: persists the alert and broadcasts it. */
   setAlertHandler(handler) {
     this.alertHandler = handler || null;
+  }
+
+  /** Wired at boot: pushes edge activity to the canvas. */
+  setEdgeHandler(handler) {
+    this.edgeHandler = handler || null;
   }
 
   async handleAlert(alert) {
@@ -78,6 +91,12 @@ class RuleRegistry {
               ruleName: document.name,
               deviceId,
             }),
+          onEdgeActivity: (activity) => {
+            if (!this.edgeHandler) return;
+            if (!this.activityGate.allow(activity.edgeId)) return;
+
+            this.edgeHandler({ ...activity, ruleId: id });
+          },
         }
       ).subscribe({
         error: (error) =>

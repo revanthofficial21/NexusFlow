@@ -41,6 +41,7 @@ const startServer = async () => {
 
     const registry = getRegistry();
     registry.setAlertHandler((alert) => alerts.record(alert));
+    registry.setEdgeHandler((activity) => realtime.broadcastEdgeActivity(activity));
 
     // Live charts: every stored point goes out to the device's room.
     telemetryStream().subscribe((document) => realtime.broadcastTelemetry(document));

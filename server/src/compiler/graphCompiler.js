@@ -175,8 +175,10 @@ function describeGraph(graph) {
 }
 
 function compileGraph(graph, sensorData$, options = {}) {
-  const { orderedNodes } = analyseGraph(graph);
+  const { orderedNodes, edges } = analyseGraph(graph);
   const onAlert = typeof options.onAlert === "function" ? options.onAlert : null;
+  const onEdgeActivity =
+    typeof options.onEdgeActivity === "function" ? options.onEdgeActivity : null;
 
   // Step 4: Build RxJS operators
   const operators = [];
@@ -318,6 +320,18 @@ function compileGraph(graph, sensorData$, options = {}) {
       default: {
         throw graphError(
           `Unsupported node type: ${node.type}`
+        );
+      }
+    }
+
+    // Report the wire leaving this node once a value has passed through it, which
+    // is what lights the connection up on the canvas.
+    if (onEdgeActivity) {
+      const outgoing = edges.find((edge) => edge.source === node.id);
+
+      if (outgoing) {
+        operators.push(
+          tap(() => onEdgeActivity({ edgeId: outgoing.id, nodeId: node.id }))
         );
       }
     }

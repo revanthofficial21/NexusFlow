@@ -193,6 +193,7 @@ const library = [
 export default function FlowCanvas({
   onGraphChange,
   initialGraph,
+  activeEdges = {},
 }) {
   const [nodes, setNodes, onNodesChange] = useNodesState(
     cloneNodes(initialGraph?.nodes ?? initialNodes)
@@ -355,6 +356,22 @@ export default function FlowCanvas({
     setEdges(cloneEdges(initialEdges));
     setSelectedNodeId(null);
   };
+
+  // Derived, display-only: a wire that carried data in the last second is drawn
+  // brighter and animated. The underlying edge state is untouched.
+  const styledEdges = edges.map((edge) => {
+    const active = Boolean(activeEdges[edge.id]);
+
+    return {
+      ...edge,
+      animated: active,
+      style: {
+        stroke: active ? "#38bdf8" : "#64748b",
+        strokeWidth: active ? 2.5 : 1.5,
+        filter: active ? "drop-shadow(0 0 6px rgba(56,189,248,0.8))" : "none",
+      },
+    };
+  });
 
   return (
     <div className="flow-workspace">
@@ -551,7 +568,7 @@ export default function FlowCanvas({
         <div className="flow-canvas">
           <ReactFlow
             nodes={nodes}
-            edges={edges}
+            edges={styledEdges}
             nodeTypes={nodeTypes}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
