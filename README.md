@@ -304,7 +304,9 @@ cd client && npm run dev
 | GET | `/api/telemetry/latest` | Latest readings, optionally by device |
 | POST | `/api/compiler/parse` | Validate a graph and report the execution plan, without running it |
 | POST | `/api/compiler/execute` | Compile and run a graph against sample readings |
-| GET/POST/PUT/DELETE | `/api/pipelines` | Saved pipeline CRUD |
+| GET/POST/PUT/DELETE | `/api/pipelines` | Saved pipeline CRUD, each with a `running` flag |
+| GET | `/api/alerts` | Alert history, newest first |
+| PATCH | `/api/alerts/:id/ack` | Acknowledge an alert |
 
 `GET /api/health` returns `503` when MongoDB is disconnected, so it is safe to use
 as a real health check.
@@ -335,6 +337,24 @@ Saving a pipeline compiles it immediately: ingestion publishes each stored point
 onto one shared RxJS subject, and every saved rule subscribes to the readings for
 its sensor node's `deviceId`. Rules are recompiled at boot from MongoDB, so they
 survive a restart. `GET /api/pipelines` reports `running` per pipeline.
+
+### Socket.IO
+
+The API and the socket server share port 5000.
+
+| Direction | Event | Payload |
+| --- | --- | --- |
+| client to server | `subscribe:device` | `{ deviceId }` |
+| client to server | `unsubscribe:device` | `{ deviceId }` |
+| server to client | `telemetry` | `{ deviceId, metric, value, timestamp }` for that device only |
+| server to client | `alert` | the recorded alert document, broadcast to everyone |
+
+### Alerts
+
+When a rule's alert node matches, the registry hands the alert to
+`services/alertService`, which stores it in the `alerts` collection and broadcasts
+it. `POST /api/compiler/execute` passes no alert handler, so a dry run never
+writes an alert.
 
 ### End-to-end check
 

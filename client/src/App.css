@@ -623,3 +623,58 @@ body {
 .pipeline-error {
   color: #f87171;
 }
+
+/* Live alerts panel */
+.alert-panel {
+  margin: 16px 12px;
+  padding: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 10px;
+}
+
+.alert-panel h3 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  margin: 0 0 8px;
+  color: #94a3b8;
+}
+
+.alert-panel ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.alert-panel li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px;
+  border-radius: 8px;
+  background: rgba(251, 113, 133, 0.08);
+  border-left: 3px solid #fb7185;
+  font-size: 12px;
+}
+
+.alert-panel li span { color: #e2e8f0; }
+.alert-panel li small { color: #94a3b8; font-size: 10px; }
+.alert-panel .muted { color: #94a3b8; font-size: 12px; margin: 0; }
+
+.dot-on,
+.dot-off {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.dot-on { background: #4ade80; }
+.dot-off { background: #64748b; }

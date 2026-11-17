@@ -236,6 +236,14 @@ const server = app.listen(0, async () => {
     assert.strictEqual(res.status, 400);
     console.log("Test 14 passed: parse rejects an invalid graph with 400");
 
+    // 12. Alerts are database-backed, so they report 503 without a database.
+    res = await fetch(`${base}/api/alerts?limit=5`);
+    body = await res.json();
+
+    assert.strictEqual(res.status, 503);
+    assert.strictEqual(body.message, "Database unavailable");
+    console.log("Test 15 passed: GET /api/alerts returns 503 when the DB is down");
+
     console.log("\nAll HTTP tests passed!");
   } catch (error) {
     console.error("HTTP test failed:", error.message);

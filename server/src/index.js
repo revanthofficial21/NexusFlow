@@ -1,6 +1,7 @@
 
 require("dotenv").config();
 
+const http = require("node:http");
 const mongoose = require("mongoose");
 
 const app = require("./app");
@@ -8,6 +9,9 @@ const connectDB = require("./config/db");
 const { ensureTelemetryCollection } = require("./config/timeseries");
 const Pipeline = require("./models/Pipeline");
 const { getRegistry } = require("./streams/ruleRegistry");
+const { telemetryStream } = require("./streams/telemetryBus");
+const { initSocket } = require("./realtime/socket");
+const { AlertService } = require("./services/alertService");
 
 const PORT = process.env.PORT || 5000;
 
@@ -23,9 +27,28 @@ const startServer = async () => {
     // a restart without being re-saved.
     await getRegistry().bootstrap(Pipeline);
 
-    const server = app.listen(PORT, () => {
+    // Socket.IO needs the raw HTTP server, not the Express app.
+    const httpServer = http.createServer(app);
+    const realtime = initSocket(httpServer, {
+      origin: (process.env.CLIENT_ORIGIN ||
+        "http://localhost:5173,http://127.0.0.1:5173")
+        .split(",")
+        .map((value) => value.trim()),
+    });
+
+    const alerts = new AlertService();
+    alerts.setBroadcast(realtime.broadcastAlert);
+
+    const registry = getRegistry();
+    registry.setAlertHandler((alert) => alerts.record(alert));
+
+    // Live charts: every stored point goes out to the device's room.
+    telemetryStream().subscribe((document) => realtime.broadcastTelemetry(document));
+
+    const server = httpServer.listen(PORT, () => {
       console.log(`NexusFlow server running on port ${PORT}`);
       console.log(`Health check: http://localhost:${PORT}/api/health`);
+      console.log(`Socket.IO listening on the same port`);
     });
 
     // Without this, a restart leaves the Mongo connection and the listening

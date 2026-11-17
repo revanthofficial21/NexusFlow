@@ -174,8 +174,9 @@ function describeGraph(graph) {
   };
 }
 
-function compileGraph(graph, sensorData$) {
+function compileGraph(graph, sensorData$, options = {}) {
   const { orderedNodes } = analyseGraph(graph);
+  const onAlert = typeof options.onAlert === "function" ? options.onAlert : null;
 
   // Step 4: Build RxJS operators
   const operators = [];
@@ -299,7 +300,15 @@ function compileGraph(graph, sensorData$) {
       case "alert": {
         operators.push(
           tap((value) => {
-            console.log("NEXUSFLOW ALERT:", value);
+            // Reporting is the caller's job: a dry run passes no handler, so
+            // nothing is persisted from POST /api/compiler/execute.
+            onAlert?.({
+              nodeId: node.id,
+              value,
+              message: settings.label
+                ? `${settings.label}: ${value}`
+                : `Rule matched: ${value}`,
+            });
           })
         );
 

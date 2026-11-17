@@ -27,6 +27,22 @@ class RuleRegistry {
     this.bus = bus || { asObservable: telemetryStream };
     this.logger = logger;
     this.pipelines = new Map();
+    this.alertHandler = null;
+  }
+
+  /** Wired at boot: persists the alert and broadcasts it. */
+  setAlertHandler(handler) {
+    this.alertHandler = handler || null;
+  }
+
+  async handleAlert(alert) {
+    if (!this.alertHandler) return;
+
+    try {
+      await this.alertHandler(alert);
+    } catch (error) {
+      this.logger.error(`[registry] alert not recorded: ${error.message}`);
+    }
   }
 
   /** Compiles one saved pipeline document, replacing any previous subscription. */
@@ -42,7 +58,16 @@ class RuleRegistry {
 
       const subscription = compileGraph(
         graph,
-        liveSourceFor(this.bus, deviceId)
+        liveSourceFor(this.bus, deviceId),
+        {
+          onAlert: (alert) =>
+            this.handleAlert({
+              ...alert,
+              ruleId: id,
+              ruleName: document.name,
+              deviceId,
+            }),
+        }
       ).subscribe({
         error: (error) =>
           this.logger.error(`[registry] pipeline ${id} failed: ${error.message}`),

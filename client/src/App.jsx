@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import FlowCanvas from "./components/graph/FlowCanvas";
 import { executeGraph } from "./services/compilerService";
 import { serializeGraph } from "./services/graphService";
+import { useAlerts } from "./hooks/useAlerts";
 
 import {
   savePipeline,
@@ -45,6 +46,9 @@ function App() {
   const [executionResult, setExecutionResult] = useState(null);
   const [executionError, setExecutionError] = useState("");
   const [backendConnected, setBackendConnected] = useState(false);
+
+  // Live rule matches, pushed over Socket.IO.
+  const { alerts: liveAlerts, connected: alertsConnected } = useAlerts();
 
   // Receive graph updates from FlowCanvas
   const handleGraphChange = useCallback((nodes, edges) => {
@@ -341,6 +345,29 @@ function App() {
           <div className="nav-item">◉ Devices</div>
           <div className="nav-item">⚡ Telemetry</div>
           <div className="nav-item">♧ Alerts</div>
+
+          <div className="alert-panel">
+            <h3>
+              LIVE ALERTS
+              <span className={alertsConnected ? "dot-on" : "dot-off"} />
+            </h3>
+
+            {liveAlerts.length === 0 ? (
+              <p className="muted">No alerts yet.</p>
+            ) : (
+              <ul>
+                {liveAlerts.map((alert, index) => (
+                  <li key={alert._id || index}>
+                    <strong>{alert.ruleName || "Rule"}</strong>
+                    <span>{alert.message}</span>
+                    <small>
+                      {new Date(alert.at).toLocaleTimeString()}
+                    </small>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
 
           <div className="sidebar-bottom">
             <span className="status-dot"></span>
