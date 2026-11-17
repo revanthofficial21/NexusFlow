@@ -244,6 +244,29 @@ const server = app.listen(0, async () => {
     assert.strictEqual(body.message, "Database unavailable");
     console.log("Test 15 passed: GET /api/alerts returns 503 when the DB is down");
 
+    // 13. Date range validation happens before the database is touched.
+    res = await fetch(`${base}/api/telemetry/latest?startDate=not-a-date`);
+    body = await res.json();
+
+    assert.strictEqual(res.status, 400);
+    assert.match(body.message, /startDate is not a valid date/);
+    console.log("Test 16 passed: an invalid startDate is rejected with 400");
+
+    res = await fetch(
+      `${base}/api/telemetry/latest?startDate=2026-11-17T10:00:00Z&endDate=2026-11-17T09:00:00Z`
+    );
+    body = await res.json();
+
+    assert.strictEqual(res.status, 400);
+    assert.match(body.message, /before endDate/);
+    console.log("Test 17 passed: an inverted date range is rejected with 400");
+
+    // 14. Stats are database-backed.
+    res = await fetch(`${base}/api/telemetry/stats`);
+
+    assert.strictEqual(res.status, 503);
+    console.log("Test 18 passed: /api/telemetry/stats returns 503 without a database");
+
     console.log("\nAll HTTP tests passed!");
   } catch (error) {
     console.error("HTTP test failed:", error.message);

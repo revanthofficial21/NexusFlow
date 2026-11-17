@@ -301,7 +301,8 @@ cd client && npm run dev
 | GET | `/api/health` | Liveness plus MongoDB connection state |
 | POST | `/api/telemetry/ingest` | Ingest a single reading |
 | POST | `/api/telemetry/batch` | Ingest up to 2000 readings |
-| GET | `/api/telemetry/latest` | Latest readings, optionally by device |
+| GET | `/api/telemetry/latest` | Latest readings; filters: `deviceId`, `startDate`, `endDate`, `limit` |
+| GET | `/api/telemetry/stats` | Per-device rollup: readings, avg/max temperature and humidity, last seen |
 | POST | `/api/compiler/parse` | Validate a graph and report the execution plan, without running it |
 | POST | `/api/compiler/execute` | Compile and run a graph against sample readings |
 | GET/POST/PUT/DELETE | `/api/pipelines` | Saved pipeline CRUD, each with a `running` flag |

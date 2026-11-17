@@ -172,6 +172,22 @@ async function receiveTelemetryBatch(req, res) {
   }
 }
 
+/**
+ * Parses an optional ISO date. Returns { value } or { error } so the caller can
+ * answer 400 instead of letting an Invalid Date reach the query.
+ */
+function parseDateParam(raw, name) {
+  if (raw === undefined || raw === "") return { value: null };
+
+  const value = new Date(raw);
+
+  if (Number.isNaN(value.getTime())) {
+    return { error: `${name} is not a valid date` };
+  }
+
+  return { value };
+}
+
 async function getLatestTelemetry(req, res) {
   // A negative or fractional limit used to reach the driver, which rejected it
   // and turned a bad query into a 500.
@@ -182,14 +198,52 @@ async function getLatestTelemetry(req, res) {
 
   const deviceId = req.query.deviceId;
 
+  // Date range filtering, as the dashboard needs for "last hour" style views.
+  const start = parseDateParam(req.query.startDate, "startDate");
+  const end = parseDateParam(req.query.endDate, "endDate");
+
+  if (start.error || end.error) {
+    return res.status(400).json({
+      success: false,
+      message: start.error || end.error,
+    });
+  }
+
+  if (start.value && end.value && start.value > end.value) {
+    return res.status(400).json({
+      success: false,
+      message: "startDate must be before endDate",
+    });
+  }
+
   try {
-    const query = deviceId ? { "metadata.deviceId": deviceId } : {};
+    const query = {};
+
+    if (deviceId) query["metadata.deviceId"] = deviceId;
+
+    if (start.value || end.value) {
+      query.timestamp = {
+        ...(start.value ? { $gte: start.value } : {}),
+        ...(end.value ? { $lte: end.value } : {}),
+      };
+    }
+
     const records = await Telemetry.find(query)
       .sort({ timestamp: -1 })
       .limit(limit)
       .lean();
 
-    return res.status(200).json({ success: true, count: records.length, records });
+    return res.status(200).json({
+      success: true,
+      count: records.length,
+      filters: {
+        deviceId: deviceId || null,
+        startDate: start.value,
+        endDate: end.value,
+        limit,
+      },
+      records,
+    });
   } catch (error) {
     if (isDatabaseUnavailable(error)) {
       return respondDatabaseUnavailable(res);
@@ -204,9 +258,51 @@ async function getLatestTelemetry(req, res) {
   }
 }
 
+/**
+ * Per-device rollup: reading counts, average and peak readings, last seen.
+ * Backs the device cards on the dashboard.
+ */
+async function getTelemetryStats(req, res) {
+  try {
+    const devices = await Telemetry.aggregate([
+      { $sort: { timestamp: -1 } },
+      {
+        $group: {
+          _id: "$metadata.deviceId",
+          deviceType: { $first: "$metadata.deviceType" },
+          location: { $first: "$metadata.location" },
+          totalReadings: { $sum: 1 },
+          avgTemperature: { $avg: "$readings.temperature" },
+          maxTemperature: { $max: "$readings.temperature" },
+          avgHumidity: { $avg: "$readings.humidity" },
+          maxHumidity: { $max: "$readings.humidity" },
+          latestTimestamp: { $first: "$timestamp" },
+        },
+      },
+      { $sort: { latestTimestamp: -1 } },
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      deviceCount: devices.length,
+      devices,
+    });
+  } catch (error) {
+    if (isDatabaseUnavailable(error)) return respondDatabaseUnavailable(res);
+
+    console.error("Telemetry statistics error:", error.message);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch telemetry statistics",
+    });
+  }
+}
+
 module.exports = {
   receiveTelemetry,
   receiveTelemetryBatch,
   getLatestTelemetry,
+  getTelemetryStats,
   validatePoint,
 };

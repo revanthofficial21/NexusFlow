@@ -99,6 +99,29 @@ async function main() {
       latest.body?.records?.[0]?.readings !== undefined
   );
 
+  const from = new Date(Date.now() - 3600_000).toISOString();
+  const to = new Date(Date.now() + 60_000).toISOString();
+  const ranged = await call(
+    "GET",
+    `/api/telemetry/latest?deviceId=${deviceId}&startDate=${encodeURIComponent(from)}&endDate=${encodeURIComponent(to)}`
+  );
+  check("latest honours a date range", ranged.status === 200 && ranged.body?.count === 4, `got ${ranged.status}, count ${ranged.body?.count}`);
+
+  const stats = await call("GET", "/api/telemetry/stats");
+  check("GET /api/telemetry/stats returns 200", stats.status === 200, `got ${stats.status}`);
+
+  const statsForDevice = (stats.body?.devices || []).find((device) => device._id === deviceId);
+  check("stats include the device just written to", Boolean(statsForDevice));
+  check(
+    "stats report the reading count for that device",
+    statsForDevice?.totalReadings === 4,
+    `got ${statsForDevice?.totalReadings}`
+  );
+
+  const alerts = await call("GET", "/api/alerts?limit=5");
+  check("GET /api/alerts returns 200", alerts.status === 200, `got ${alerts.status}`);
+  check("alerts response carries an array", Array.isArray(alerts.body?.alerts));
+
   // ---------------------------------------------------------------- pipelines
   console.log("\nPipeline CRUD");
   const graph = {
