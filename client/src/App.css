@@ -678,3 +678,41 @@ body {
 
 .dot-on { background: #4ade80; }
 .dot-off { background: #64748b; }
+
+/* Live telemetry panel */
+.live-panel {
+  margin-bottom: 18px;
+  padding: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 12px;
+}
+
+.live-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.live-panel__head h3 {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: #94a3b8;
+}
+
+.live-panel__controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.live-panel__controls input {
+  width: 150px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: #0f172a;
+  color: #e2e8f0;
+  font-size: 12px;
+}

@@ -5,6 +5,8 @@ import FlowCanvas from "./components/graph/FlowCanvas";
 import { executeGraph } from "./services/compilerService";
 import { serializeGraph } from "./services/graphService";
 import { useAlerts } from "./hooks/useAlerts";
+import { useTelemetry } from "./hooks/useTelemetry";
+import TelemetryChart from "./components/TelemetryChart";
 
 import {
   savePipeline,
@@ -49,6 +51,12 @@ function App() {
 
   // Live rule matches, pushed over Socket.IO.
   const { alerts: liveAlerts, connected: alertsConnected } = useAlerts();
+
+  // Live chart: one device, fed by the telemetry socket room.
+  const [chartDevice, setChartDevice] = useState("turbine-01");
+  const { points: livePoints, connected: telemetryConnected } = useTelemetry({
+    deviceId: chartDevice,
+  });
 
   // Receive graph updates from FlowCanvas
   const handleGraphChange = useCallback((nodes, edges) => {
@@ -389,6 +397,27 @@ function App() {
               </p>
             </div>
           </div>
+
+          {/* Live telemetry */}
+          <section className="live-panel">
+            <div className="live-panel__head">
+              <h3>LIVE TELEMETRY</h3>
+
+              <div className="live-panel__controls">
+                <span className={telemetryConnected ? "dot-on" : "dot-off"} />
+                <input
+                  type="text"
+                  value={chartDevice}
+                  onChange={(event) => setChartDevice(event.target.value)}
+                  placeholder="device id"
+                  aria-label="device id"
+                />
+                <span className="muted">{livePoints.length} points</span>
+              </div>
+            </div>
+
+            <TelemetryChart points={livePoints} />
+          </section>
 
           {/* Pipeline Management */}
           <section className="pipeline-manager">

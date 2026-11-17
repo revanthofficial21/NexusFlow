@@ -1,6 +1,9 @@
 const { filter, map } = require("rxjs");
 const { compileGraph, analyseGraph } = require("../compiler/graphCompiler");
 const { telemetryStream } = require("./telemetryBus");
+const { createAlertThrottle } = require("./alertThrottle");
+
+const ALERT_COOLDOWN_MS = Number(process.env.ALERT_COOLDOWN_MS || 30000);
 
 /**
  * Live pipelines: one subscription per saved rule, fed by the telemetry bus.
@@ -37,6 +40,14 @@ class RuleRegistry {
 
   async handleAlert(alert) {
     if (!this.alertHandler) return;
+
+    const entry = this.pipelines.get(String(alert.ruleId));
+
+    // One alert per rule per cooldown window. Suppressed matches are counted, not
+    // silently discarded.
+    if (entry && !entry.throttle.allow()) {
+      return;
+    }
 
     try {
       await this.alertHandler(alert);
@@ -78,6 +89,7 @@ class RuleRegistry {
         deviceId,
         name: document.name,
         compiledAt: new Date().toISOString(),
+        throttle: createAlertThrottle({ cooldownMs: ALERT_COOLDOWN_MS }),
       });
 
       this.logger.log(
@@ -118,6 +130,8 @@ class RuleRegistry {
       name: entry.name,
       deviceId: entry.deviceId,
       compiledAt: entry.compiledAt,
+      suppressedAlerts: entry.throttle.suppressedCount,
+      alertCooldownMs: ALERT_COOLDOWN_MS,
     };
   }
 

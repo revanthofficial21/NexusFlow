@@ -337,7 +337,16 @@ in mongosh.
 Saving a pipeline compiles it immediately: ingestion publishes each stored point
 onto one shared RxJS subject, and every saved rule subscribes to the readings for
 its sensor node's `deviceId`. Rules are recompiled at boot from MongoDB, so they
-survive a restart. `GET /api/pipelines` reports `running` per pipeline.
+survive a restart. `GET /api/pipelines` reports `running` per pipeline and
+`suppressedAlerts` for each.
+
+Alert throttling: a rule records at most one alert per `ALERT_COOLDOWN_MS`
+(default 30s). Matches inside the window are counted, not silently dropped - the
+count shows up as `suppressedAlerts` in the pipeline status. Without it, a stream
+above the threshold would write an alert per point.
+
+The dashboard shows a live chart for one device: the server broadcasts each stored
+point into a `device:<id>` room and the client's `useTelemetry` hook joins it.
 
 ### Socket.IO
 

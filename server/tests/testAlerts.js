@@ -81,6 +81,33 @@ const silent = { log() {}, warn() {}, error() {} };
   assert.strictEqual(bus.observers.length, 1);
   console.log("Test 5 passed: a failing alert handler does not break the pipeline");
 
+  // 6. The throttle allows one alert per cooldown window and counts the rest.
+  const { createAlertThrottle } = require("../src/streams/alertThrottle");
+  const throttle = createAlertThrottle({ cooldownMs: 30000 });
+
+  assert.strictEqual(throttle.allow(1000), true);
+  assert.strictEqual(throttle.allow(2000), false);
+  assert.strictEqual(throttle.allow(30000), false);
+  assert.strictEqual(throttle.allow(31001), true);
+  assert.strictEqual(throttle.suppressedCount, 2);
+  console.log("Test 6 passed: the throttle allows one alert per cooldown window");
+
+  // 7. End to end through the registry: a burst of matching points produces one
+  // alert, and the suppression is visible in the status.
+  const burstBus = new Subject();
+  const burstRegistry = new RuleRegistry({ bus: burstBus, logger: silent });
+  const recorded = [];
+
+  burstRegistry.setAlertHandler(async (alert) => recorded.push(alert));
+  burstRegistry.compile({ _id: "rule-burst", name: "Burst", ...graph });
+
+  for (const temperature of [90, 91, 92, 93, 94]) burstBus.next(point(temperature));
+  await new Promise((resolve) => setTimeout(resolve, 20));
+
+  assert.strictEqual(recorded.length, 1);
+  assert.strictEqual(burstRegistry.status("rule-burst").suppressedAlerts, 4);
+  console.log("Test 7 passed: five matching points in a burst record one alert and report 4 suppressed");
+
   console.log("\nAll alert tests passed!");
 })().catch((error) => {
   console.error("Alert test failed:", error.message);
