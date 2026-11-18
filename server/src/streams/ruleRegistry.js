@@ -93,7 +93,10 @@ class RuleRegistry {
             }),
           onEdgeActivity: (activity) => {
             if (!this.edgeHandler) return;
-            if (!this.activityGate.allow(activity.edgeId)) return;
+
+            // Keyed by rule as well as edge: two graphs both name their wires
+            // "e1", and a shared key let one rule silence the other's canvas.
+            if (!this.activityGate.allow(`${id}:${activity.edgeId}`)) return;
 
             this.edgeHandler({ ...activity, ruleId: id });
           },

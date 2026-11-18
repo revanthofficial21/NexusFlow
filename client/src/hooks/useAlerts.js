@@ -64,16 +64,21 @@ export function useAlerts({ deviceId, acknowledged } = {}) {
 
         if (!response.ok) return;
 
-        setAlerts((previous) =>
-          previous.map((item) =>
+        setAlerts((previous) => {
+          // Under the "unacknowledged" filter the row no longer belongs in view.
+          if (acknowledged === "false") {
+            return previous.filter((item) => (item._id || item.id) !== id);
+          }
+
+          return previous.map((item) =>
             (item._id || item.id) === id ? { ...item, acknowledged: true } : item
-          )
-        );
+          );
+        });
       } catch {
         // Leave the row as it was; the next refresh will correct it.
       }
     },
-    []
+    [acknowledged]
   );
 
   return { alerts, connected, acknowledge, refresh: load };

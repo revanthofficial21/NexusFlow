@@ -23,12 +23,16 @@ function initSocket(httpServer, { origin }) {
     io,
     broadcastTelemetry(document) {
       const deviceId = document?.metadata?.deviceId;
-      if (!deviceId) return;
+      const temperature = document?.readings?.temperature;
+
+      // Humidity-only points have no temperature. Emitting value: null put a hole
+      // in the chart, so they are not broadcast at all.
+      if (!deviceId || typeof temperature !== "number") return;
 
       io.to(`device:${deviceId}`).emit("telemetry", {
         deviceId,
         metric: "temperature",
-        value: document.readings?.temperature ?? null,
+        value: temperature,
         timestamp: document.timestamp,
       });
     },

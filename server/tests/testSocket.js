@@ -58,6 +58,24 @@ async function main() {
   assert.strictEqual(leaked, false);
   console.log("Test 3 passed: another device's telemetry is not delivered");
 
+  // 2b. A humidity-only point has no temperature and must not be broadcast, or
+  // the chart gets a null point.
+  let nullPoint = false;
+  const onNull = (payload) => {
+    if (payload?.value === null || payload?.value === undefined) nullPoint = true;
+  };
+  client.on("telemetry", onNull);
+  realtime.broadcastTelemetry({
+    timestamp: new Date().toISOString(),
+    metadata: { deviceId: "turbine-01", deviceType: "temperature" },
+    readings: { temperature: null, humidity: 61 },
+  });
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  client.off("telemetry", onNull);
+
+  assert.strictEqual(nullPoint, false);
+  console.log("Test 3 passed: a humidity-only point is not broadcast as null");
+
   // 3. Alerts are broadcast to everyone.
   const alertReceived = waitFor(client, "alert");
   realtime.broadcastAlert({ ruleName: "Turbine overheat", message: "hot", value: 92.5 });

@@ -264,8 +264,10 @@ async function getLatestTelemetry(req, res) {
  */
 async function getTelemetryStats(req, res) {
   try {
+    // No leading $sort: sorting the whole collection before grouping was a full
+    // pass over every reading. $max gives the same "last seen" value for free, and
+    // deviceType/location are constant per device, so $first is safe without it.
     const devices = await Telemetry.aggregate([
-      { $sort: { timestamp: -1 } },
       {
         $group: {
           _id: "$metadata.deviceId",
@@ -276,7 +278,7 @@ async function getTelemetryStats(req, res) {
           maxTemperature: { $max: "$readings.temperature" },
           avgHumidity: { $avg: "$readings.humidity" },
           maxHumidity: { $max: "$readings.humidity" },
-          latestTimestamp: { $first: "$timestamp" },
+          latestTimestamp: { $max: "$timestamp" },
         },
       },
       { $sort: { latestTimestamp: -1 } },

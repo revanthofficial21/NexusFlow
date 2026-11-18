@@ -80,6 +80,29 @@ async function main() {
     `Test 4 passed: a burst of 18 wire crossings produced ${forwarded.length} events, all tagged with the rule id`
   );
 
+  // 5. Two rules whose graphs both name their wires "e1" must not silence each
+  // other: the gate is keyed by rule + edge.
+  const sharedBus = new Subject();
+  const sharedRegistry = new RuleRegistry({ bus: sharedBus, logger: silent });
+  const perRule = {};
+
+  sharedRegistry.setEdgeHandler((activity) => {
+    perRule[activity.ruleId] = (perRule[activity.ruleId] || 0) + 1;
+  });
+
+  sharedRegistry.compile({ _id: "rule-a", name: "A", ...graph });
+  sharedRegistry.compile({ _id: "rule-b", name: "B", ...graph });
+
+  sharedBus.next(point(90));
+  sharedBus.next(point(95));
+  await new Promise((resolve) => setTimeout(resolve, 20));
+
+  assert.ok(perRule["rule-a"] > 0, "rule A should report activity");
+  assert.ok(perRule["rule-b"] > 0, "rule B should report activity despite sharing edge ids");
+  console.log(
+    `Test 5 passed: rules with identical edge ids both report (A=${perRule["rule-a"]}, B=${perRule["rule-b"]})`
+  );
+
   console.log("\nAll edge activity tests passed!");
 }
 
