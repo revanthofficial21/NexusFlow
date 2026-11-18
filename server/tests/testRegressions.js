@@ -46,15 +46,31 @@ assert.match(cycleResult.errors.join(" "), /cycle/i);
 console.log("Test 1 passed: cyclic graph rejected by the validator");
 
 // 2. Fan-out fails loudly instead of dropping the branch ---------------------
+// sensor -> average -> alert, and sensor -> alert directly
 const fanOut = {
-  nodes: [node("1", "sensor"), node("2", "average", { windowSize: 2 }), node("3", "alert")],
+  nodes: [
+    node("1", "sensor"),
+    node("2", "average", { windowSize: 2 }),
+    node("3", "alert"),
+    node("4", "alert"),
+  ],
   edges: [
     { id: "a", source: "1", target: "2" },
-    { id: "b", source: "1", target: "3" },
+    { id: "b", source: "2", target: "3" },
+    { id: "c", source: "1", target: "4" },
   ],
 };
 
-expectThrow(() => run(fanOut, [10, 20]), /outgoing connections/, "fan-out is rejected");
+// Fan-out is supported: one sensor feeding two branches. The average branch
+// filters down to a single value; the direct branch sees every reading.
+const branches = [];
+compileGraph(fanOut, of(10, 20), {
+  onAlert: (alert) => branches.push(`${alert.nodeId}:${alert.value}`),
+}).subscribe();
+
+// node 3 is the average branch (one value: 15), node 4 the direct branch (10, 20)
+assert.deepStrictEqual(branches.sort(), ["3:15", "4:10", "4:20"], "both branches should fire");
+console.log("Test 2 passed: one sensor feeds two branches, each independently");
 
 // 3. Nodes outside the sensor chain are reported -----------------------------
 const orphan = {
@@ -66,7 +82,8 @@ const orphan = {
   edges: [{ id: "a", source: "1", target: "2" }],
 };
 
-expectThrow(() => run(orphan, [10, 20]), /not connected/, "orphan node is reported");
+// A node with no incoming edge is a plan error, reported before anything runs.
+expectThrow(() => run(orphan, [10, 20]), /has no input/, "orphan node is reported");
 
 // 4. A cleared threshold falls back to 80 ------------------------------------
 const cleared = {

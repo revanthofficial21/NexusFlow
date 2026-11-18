@@ -87,27 +87,28 @@ const server = app.listen(0, async () => {
     console.log("Test 6 passed: an oversized batch returns 413");
 
     // 6. Compiler: graph errors keep their 400 status through the controller.
-    const graph = {
+    // Fan-out is valid now, so this uses a genuinely broken node instead.
+    const brokenOperator = {
       nodes: [
         { id: "1", type: "sensor", data: {} },
-        { id: "2", type: "alert", data: {} },
+        { id: "2", type: "threshold", data: { threshold: 5, operator: "roughly" } },
         { id: "3", type: "alert", data: {} },
       ],
       edges: [
         { id: "a", source: "1", target: "2" },
-        { id: "b", source: "1", target: "3" },
+        { id: "b", source: "2", target: "3" },
       ],
     };
 
     res = await fetch(`${base}/api/compiler/execute`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ graph, sensorData: [1, 2] }),
+      body: JSON.stringify({ graph: brokenOperator, sensorData: [1, 2] }),
     });
     body = await res.json();
 
     assert.strictEqual(res.status, 400);
-    assert.match(body.message, /outgoing connections/);
+    assert.match(body.message, /Unsupported threshold operator/);
     console.log("Test 7 passed: compiler graph errors return 400, not 500");
 
     // 7. Pipeline validation happens before the database is touched.
@@ -274,6 +275,34 @@ const server = app.listen(0, async () => {
     assert.strictEqual(res.status, 400);
     assert.match(body.message, /acknowledged must be/);
     console.log("Test 19 passed: an invalid acknowledged filter is rejected with 400");
+
+    // 16. A branching graph executes both branches over HTTP.
+    res = await fetch(`${base}/api/compiler/execute`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        graph: {
+          nodes: [
+            { id: "1", type: "sensor", data: {} },
+            { id: "2", type: "average", data: { windowSize: 2 } },
+            { id: "3", type: "alert", data: {} },
+            { id: "4", type: "alert", data: {} },
+          ],
+          edges: [
+            { id: "a", source: "1", target: "2" },
+            { id: "b", source: "2", target: "3" },
+            { id: "c", source: "1", target: "4" },
+          ],
+        },
+        sensorData: [10, 20],
+      }),
+    });
+    body = await res.json();
+
+    assert.strictEqual(res.status, 200);
+    // leaf order follows the topological sort: the direct branch and the average
+    assert.deepStrictEqual([...body.results].sort((a, b) => a - b), [10, 15, 20]);
+    console.log("Test 20 passed: a branching graph executes both branches");
 
     console.log("\nAll HTTP tests passed!");
   } catch (error) {

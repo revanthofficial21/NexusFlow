@@ -1,5 +1,5 @@
 
-const { of } = require("rxjs");
+const { merge } = require("rxjs");
 const {
   bufferCount,
   map,
@@ -50,220 +50,236 @@ function graphError(message) {
 }
 
 /**
- * Validates the graph and resolves the single chain that runs from the sensor to
- * its action node. Shared by compileGraph (which builds the pipeline) and
- * describeGraph (which only reports the plan), so parsing and executing cannot
- * disagree about what a graph means.
+ * Kahn topological sort. validateGraph has already rejected cycles, so this only
+ * fails if the two ever disagree - which they cannot, since both run on the same
+ * edges.
+ */
+function topologicalOrder(nodes, edges) {
+  const indegree = new Map(nodes.map((node) => [node.id, 0]));
+  const outgoing = new Map(nodes.map((node) => [node.id, []]));
+
+  for (const edge of edges) {
+    indegree.set(edge.target, (indegree.get(edge.target) ?? 0) + 1);
+    outgoing.get(edge.source)?.push(edge.target);
+  }
+
+  const queue = [...indegree.entries()]
+    .filter(([, degree]) => degree === 0)
+    .map(([id]) => id);
+  const order = [];
+
+  while (queue.length > 0) {
+    const id = queue.shift();
+    order.push(id);
+
+    for (const next of outgoing.get(id) ?? []) {
+      const remaining = indegree.get(next) - 1;
+      indegree.set(next, remaining);
+      if (remaining === 0) queue.push(next);
+    }
+  }
+
+  if (order.length !== nodes.length) throw graphError("Cycle detected in graph");
+
+  return order;
+}
+
+/**
+ * Validates the graph and resolves it into an execution plan: topological order
+ * plus the incoming/outgoing edges per node. Shared by compileGraph (which builds
+ * the pipeline) and describeGraph (which only reports it), so parsing and running
+ * cannot disagree about what a graph means.
+ *
+ * A graph is a DAG, not a chain: one sensor can feed several branches, and a node
+ * can combine several inputs.
  */
 function analyseGraph(graph) {
   const validation = validateGraph(graph);
 
   if (!validation.valid) {
-    throw graphError(
-      `Invalid graph: ${validation.errors.join(", ")}`
-    );
+    throw graphError(`Invalid graph: ${validation.errors.join(", ")}`);
   }
 
-  const nodes = graph.nodes;
-  const edges = graph.edges;
+  const nodes = graph.nodes ?? [];
+  const edges = graph.edges ?? [];
+  const sensors = nodes.filter((node) => node.type === "sensor");
 
-  const sensorNode = nodes.find(
-    (node) => node.type === "sensor"
-  );
-
-  if (!sensorNode) {
+  if (sensors.length === 0) {
     throw graphError("Graph must contain a sensor node");
   }
 
-  const orderedNodes = [];
-  let currentNode = sensorNode;
+  const order = topologicalOrder(nodes, edges);
+  const nodeById = new Map(nodes.map((node) => [node.id, node]));
+  const incoming = new Map(nodes.map((node) => [node.id, []]));
+  const outgoing = new Map(nodes.map((node) => [node.id, []]));
 
-  while (currentNode) {
-    orderedNodes.push(currentNode);
-
-    const outgoing = edges.filter(
-      (edge) => edge.source === currentNode.id
-    );
-
-    // This compiler executes a single chain. Failing loudly beats silently
-    // dropping a branch, which is what the old edges.find() did.
-    if (outgoing.length > 1) {
-      throw graphError(
-        `Node "${currentNode.id}" has ${outgoing.length} outgoing connections; ` +
-          "the compiler executes one chain per graph. Remove the extra branch."
-      );
-    }
-
-    const nextEdge = outgoing[0];
-
-    if (!nextEdge) {
-      break;
-    }
-
-    const nextNode = nodes.find(
-      (node) => node.id === nextEdge.target
-    );
-
-    if (!nextNode) {
-      break;
-    }
-
-    if (orderedNodes.some((node) => node.id === nextNode.id)) {
-      throw graphError("Cycle detected in graph");
-    }
-
-    currentNode = nextNode;
+  for (const edge of edges) {
+    incoming.get(edge.target)?.push(edge);
+    outgoing.get(edge.source)?.push(edge);
   }
 
-  // Step 3b: every node has to be part of the chain that starts at the sensor,
-  // otherwise it silently does nothing.
-  const unreachable = nodes.filter(
-    (node) => !orderedNodes.some((ordered) => ordered.id === node.id)
-  );
+  const leaves = order.filter((id) => (outgoing.get(id) ?? []).length === 0);
 
-  if (unreachable.length > 0) {
-    throw graphError(
-      `Graph contains nodes not connected to the sensor chain: ${unreachable
-        .map((node) => node.id)
-        .join(", ")}`
-    );
-  }
-
-  return { nodes, edges, sensorNode, orderedNodes };
+  return {
+    nodes,
+    edges,
+    order,
+    nodeById,
+    incoming,
+    outgoing,
+    leaves,
+    sensors,
+    sensorNode: sensors[0],
+  };
 }
 
 /**
- * Parses a graph without executing it: the same validation and chain resolution
- * compileGraph performs, reported as data. Backs POST /api/compiler/parse, so the
- * mid-project review can show parsing and execution as separate steps.
+ * Parses a graph without executing it: the same validation and plan resolution
+ * compileGraph performs, reported as data. Backs POST /api/compiler/parse.
  */
 function describeGraph(graph) {
-  const { orderedNodes } = analyseGraph(graph);
+  const { order, nodeById, incoming, outgoing } = analyseGraph(graph);
 
-  const plan = orderedNodes.map((node) => {
+  const plan = order.map((id) => {
+    const node = nodeById.get(id);
     const settings = node.data || {};
+    const wiring = {
+      id,
+      type: node.type,
+      inputs: (incoming.get(id) ?? []).map((edge) => edge.source),
+      outputs: (outgoing.get(id) ?? []).map((edge) => edge.target),
+    };
 
     switch (node.type) {
       case "sensor":
-        return { id: node.id, type: node.type, deviceId: settings.deviceId ?? null };
+        return { ...wiring, deviceId: settings.deviceId ?? null };
 
       case "average":
-        return { id: node.id, type: node.type, windowSize: settings.windowSize ?? 5 };
+        return { ...wiring, windowSize: settings.windowSize ?? 5 };
 
       case "threshold":
         return {
-          id: node.id,
-          type: node.type,
+          ...wiring,
           operator: settings.operator ?? "greaterThan",
           threshold: settings.threshold ?? 80,
         };
 
       case "webhook":
-        return { id: node.id, type: node.type, url: settings.url ?? null, method: settings.method ?? "POST" };
+        return {
+          ...wiring,
+          url: settings.url ?? null,
+          method: settings.method ?? "POST",
+        };
 
       default:
-        return { id: node.id, type: node.type };
+        return wiring;
     }
   });
 
   return {
     valid: true,
     nodeCount: plan.length,
-    executionOrder: plan.map((step) => step.id),
+    executionOrder: order,
+    branches: plan.filter((step) => step.outputs.length > 1).map((step) => step.id),
     plan,
   };
 }
 
+/**
+ * Builds the pipeline for a graph.
+ *
+ * Every node becomes an Observable, memoised by id. A node with several outgoing
+ * edges is read by several downstream nodes, and each reads it through its own
+ * subscription: the input can be a cold `of(...)` (each branch replays it) or the
+ * live telemetry bus (a Subject, which multicasts). That is why no share() is
+ * used - sharing would make the second branch of a cold source see nothing.
+ *
+ * Returns the merged stream of the graph's leaves, so callers can still subscribe
+ * to "the output of the pipeline" as before.
+ */
 function compileGraph(graph, sensorData$, options = {}) {
-  const { orderedNodes, edges } = analyseGraph(graph);
+  const analysis = analyseGraph(graph);
+  const { nodeById, incoming, outgoing, leaves, order } = analysis;
+
   const onAlert = typeof options.onAlert === "function" ? options.onAlert : null;
   const onEdgeActivity =
     typeof options.onEdgeActivity === "function" ? options.onEdgeActivity : null;
 
-  // Step 4: Build RxJS operators
-  const operators = [];
+  if (!sensorData$ || typeof sensorData$.subscribe !== "function") {
+    throw graphError("A sensorData$ stream is required");
+  }
 
-  for (const node of orderedNodes) {
+  const streams = new Map();
+
+  // Several inputs into one node are merged; a single input passes straight
+  // through without the extra operator.
+  const inputFor = (id) => {
+    const upstream = (incoming.get(id) ?? []).map((edge) => streamFor(edge.source));
+
+    if (upstream.length === 0) {
+      throw graphError(`Node "${id}" has no input`);
+    }
+
+    return upstream.length === 1 ? upstream[0] : merge(...upstream);
+  };
+
+  const streamFor = (id) => {
+    if (streams.has(id)) return streams.get(id);
+
+    const node = nodeById.get(id);
     const settings = node.data || {};
+    let stream;
 
     switch (node.type) {
-      case "sensor": {
-        // Sensor values enter through sensorData$
+      case "sensor":
+        stream = sensorData$;
         break;
-      }
 
       case "average": {
         const rawWindow = Number(settings.windowSize);
-        const windowSize = Number.isFinite(rawWindow)
-          ? Math.trunc(rawWindow)
-          : 5;
+        const windowSize = Number.isFinite(rawWindow) ? Math.trunc(rawWindow) : 5;
 
-        // Uncapped, a window of 50,000,000 buffers the whole stream in memory and
-        // never emits.
         if (windowSize < 1 || windowSize > MAX_WINDOW) {
           throw graphError(
             `Window size must be between 1 and ${MAX_WINDOW}, received "${settings.windowSize}"`
           );
         }
 
-        operators.push(
-          // startBufferEvery = 1 gives a sliding window. bufferCount also flushes
-          // the trailing partial windows when the source completes, and those
-          // must be dropped or the average is computed over too few samples.
+        stream = inputFor(id).pipe(
           bufferCount(windowSize, 1),
-
+          // bufferCount also flushes trailing partial windows on completion.
           filter((values) => values.length === windowSize),
-
-          // Calculate moving average
           map((values) => {
-            const total = values.reduce(
-              (sum, value) => sum + Number(value),
-              0
-            );
-
+            const total = values.reduce((sum, value) => sum + Number(value), 0);
             return total / values.length;
           })
         );
-
         break;
       }
 
       case "threshold": {
-        // null/undefined/"" means "not configured" and falls back to 80. An
-        // explicit 0 is a real threshold and is kept.
         const raw = settings.threshold;
         const configured =
           raw === null || raw === undefined || raw === "" ? 80 : Number(raw);
 
         if (!Number.isFinite(configured)) {
-          throw graphError(
-            `Threshold value must be a number, received "${raw}"`
-          );
+          throw graphError(`Threshold value must be a number, received "${raw}"`);
         }
 
-        const threshold = configured;
         const operator = settings.operator || "greaterThan";
-
-        // Averages are floats: 20.333333333333332 === 20.333 is false, so exact
-        // equality would almost never fire.
         const comparators = {
-          greaterThan: (value) => value > threshold,
-          lessThan: (value) => value < threshold,
-          equal: (value) => Math.abs(value - threshold) < 1e-9,
+          greaterThan: (value) => value > configured,
+          lessThan: (value) => value < configured,
+          equal: (value) => Math.abs(value - configured) < 1e-9,
         };
 
         const compare = comparators[operator];
 
-        // Validated while compiling: an unknown operator used to throw inside the
-        // filter callback, once per value.
         if (!compare) {
-          throw graphError(
-            `Unsupported threshold operator: ${operator}`
-          );
+          throw graphError(`Unsupported threshold operator: ${operator}`);
         }
 
-        operators.push(filter((value) => compare(value)));
-
+        stream = inputFor(id).pipe(filter((value) => compare(value)));
         break;
       }
 
@@ -284,9 +300,7 @@ function compileGraph(graph, sensorData$, options = {}) {
           );
         }
 
-        // tap, not mergeMap: the stream keeps flowing at sensor speed while the
-        // HTTP call happens in the background.
-        operators.push(
+        stream = inputFor(id).pipe(
           tap((value) => {
             void deliverWebhook(url, method, {
               node: node.id,
@@ -295,15 +309,13 @@ function compileGraph(graph, sensorData$, options = {}) {
             });
           })
         );
-
         break;
       }
 
-      case "alert": {
-        operators.push(
+      case "alert":
+        stream = inputFor(id).pipe(
           tap((value) => {
-            // Reporting is the caller's job: a dry run passes no handler, so
-            // nothing is persisted from POST /api/compiler/execute.
+            // Reporting is the caller's job: a dry run passes no handler.
             onAlert?.({
               nodeId: node.id,
               value,
@@ -313,36 +325,37 @@ function compileGraph(graph, sensorData$, options = {}) {
             });
           })
         );
-
         break;
-      }
 
-      default: {
-        throw graphError(
-          `Unsupported node type: ${node.type}`
-        );
-      }
+      default:
+        throw graphError(`Unsupported node type: ${node.type}`);
     }
 
-    // Report the wire leaving this node once a value has passed through it, which
-    // is what lights the connection up on the canvas.
-    if (onEdgeActivity) {
-      const outgoing = edges.find((edge) => edge.source === node.id);
+    // Report every wire leaving this node once a value has passed through it.
+    const outgoingEdges = outgoing.get(id) ?? [];
 
-      if (outgoing) {
-        operators.push(
-          tap(() => onEdgeActivity({ edgeId: outgoing.id, nodeId: node.id }))
-        );
-      }
+    if (onEdgeActivity && outgoingEdges.length > 0) {
+      stream = stream.pipe(
+        tap(() => {
+          for (const edge of outgoingEdges) {
+            onEdgeActivity({ edgeId: edge.id, nodeId: id });
+          }
+        })
+      );
     }
-  }
 
-  // Step 5: Connect the input stream
-  if (!sensorData$ || typeof sensorData$.subscribe !== "function") {
-    throw graphError("A sensorData$ stream is required");
-  }
+    streams.set(id, stream);
+    return stream;
+  };
 
-  return sensorData$.pipe(...operators);
+  // Build in dependency order so a bad node fails before anything subscribes.
+  order.forEach((id) => streamFor(id));
+
+  const outputs = leaves.map((id) => streams.get(id));
+  const pipeline = outputs.length === 1 ? outputs[0] : merge(...outputs);
+
+  pipeline.analysis = analysis;
+  return pipeline;
 }
 
 module.exports = { compileGraph, describeGraph, analyseGraph };

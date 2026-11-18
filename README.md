@@ -304,6 +304,10 @@ cd client && npm run dev
 | GET | `/api/telemetry/latest` | Latest readings; filters: `deviceId`, `startDate`, `endDate`, `limit` |
 | GET | `/api/telemetry/stats` | Per-device rollup: readings, avg/max temperature and humidity, last seen |
 | POST | `/api/compiler/parse` | Validate a graph and report the execution plan, without running it |
+
+Graphs are DAGs, not chains: one sensor can feed several branches (an average into
+a threshold and a raw alert, say), and a node with several inputs merges them. The
+parse endpoint reports `branches` - every node with more than one outgoing edge.
 | POST | `/api/compiler/execute` | Compile and run a graph against sample readings |
 | GET/POST/PUT/DELETE | `/api/pipelines` | Saved pipeline CRUD, each with a `running` flag |
 | GET | `/api/alerts` | Alert history, newest first; filters: `limit`, `ruleId`, `acknowledged` |
