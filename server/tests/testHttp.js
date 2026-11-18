@@ -267,6 +267,14 @@ const server = app.listen(0, async () => {
     assert.strictEqual(res.status, 503);
     console.log("Test 18 passed: /api/telemetry/stats returns 503 without a database");
 
+    // 15. Alert filter validation happens before the database is touched.
+    res = await fetch(`${base}/api/alerts?acknowledged=yes`);
+    body = await res.json();
+
+    assert.strictEqual(res.status, 400);
+    assert.match(body.message, /acknowledged must be/);
+    console.log("Test 19 passed: an invalid acknowledged filter is rejected with 400");
+
     console.log("\nAll HTTP tests passed!");
   } catch (error) {
     console.error("HTTP test failed:", error.message);

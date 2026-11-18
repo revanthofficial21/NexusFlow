@@ -8,6 +8,7 @@ import { useAlerts } from "./hooks/useAlerts";
 import { useTelemetry } from "./hooks/useTelemetry";
 import { useEdgeActivity } from "./hooks/useEdgeActivity";
 import TelemetryChart from "./components/TelemetryChart";
+import DevicesPanel from "./components/DevicesPanel";
 
 import {
   savePipeline,
@@ -50,8 +51,14 @@ function App() {
   const [executionError, setExecutionError] = useState("");
   const [backendConnected, setBackendConnected] = useState(false);
 
-  // Live rule matches, pushed over Socket.IO.
-  const { alerts: liveAlerts, connected: alertsConnected } = useAlerts();
+  // Live rule matches, pushed over Socket.IO. "" = every alert, "false" = only
+  // the ones nobody has acknowledged yet.
+  const [alertFilter, setAlertFilter] = useState("");
+  const {
+    alerts: liveAlerts,
+    connected: alertsConnected,
+    acknowledge: acknowledgeAlert,
+  } = useAlerts({ acknowledged: alertFilter || undefined });
 
   // Live chart: one device, fed by the telemetry socket room.
   const [chartDevice, setChartDevice] = useState("turbine-01");
@@ -364,6 +371,21 @@ function App() {
               <span className={alertsConnected ? "dot-on" : "dot-off"} />
             </h3>
 
+            <div className="alert-filters">
+              <button
+                className={alertFilter === "" ? "active" : ""}
+                onClick={() => setAlertFilter("")}
+              >
+                All
+              </button>
+              <button
+                className={alertFilter === "false" ? "active" : ""}
+                onClick={() => setAlertFilter("false")}
+              >
+                Unacknowledged
+              </button>
+            </div>
+
             {liveAlerts.length === 0 ? (
               <p className="muted">No alerts yet.</p>
             ) : (
@@ -374,7 +396,16 @@ function App() {
                     <span>{alert.message}</span>
                     <small>
                       {new Date(alert.at).toLocaleTimeString()}
+                      {alert.acknowledged ? " · acknowledged" : ""}
                     </small>
+                    {!alert.acknowledged && (
+                      <button
+                        className="ack-button"
+                        onClick={() => acknowledgeAlert(alert)}
+                      >
+                        Acknowledge
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -421,6 +452,16 @@ function App() {
             </div>
 
             <TelemetryChart points={livePoints} />
+          </section>
+
+          {/* Devices */}
+          <section className="live-panel">
+            <div className="live-panel__head">
+              <h3>DEVICES</h3>
+              <span className="muted">pick one to chart it above</span>
+            </div>
+
+            <DevicesPanel onSelect={setChartDevice} />
           </section>
 
           {/* Pipeline Management */}

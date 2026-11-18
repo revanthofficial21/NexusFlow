@@ -1,33 +1,40 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { io } from "socket.io-client";
 
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const MAX_ALERTS = 20;
 
 /**
- * Live alerts: history from the API on mount, then every new match pushed over
- * Socket.IO. The socket disconnects on unmount.
+ * Alert history plus live pushes.
+ *
+ * `acknowledged` filters the history query ("true" / "false" / undefined for all).
+ * Live alerts are appended regardless of the filter - a new match is never
+ * unacknowledged, so it always belongs in view.
  */
-export function useAlerts({ deviceId } = {}) {
+export function useAlerts({ deviceId, acknowledged } = {}) {
   const [alerts, setAlerts] = useState([]);
   const [connected, setConnected] = useState(false);
 
+  const load = useCallback(async () => {
+    const params = new URLSearchParams({ limit: String(MAX_ALERTS) });
+
+    if (acknowledged) params.set("acknowledged", acknowledged);
+
+    try {
+      const response = await fetch(`${BASE_URL}/api/alerts?${params}`);
+
+      if (!response.ok) return;
+
+      const data = await response.json();
+      setAlerts(data.alerts || []);
+    } catch {
+      // History is a nicety; the live socket is what matters.
+    }
+  }, [acknowledged]);
+
   useEffect(() => {
-    let cancelled = false;
-
-    fetch(`${BASE_URL}/api/alerts?limit=${MAX_ALERTS}`)
-      .then((response) => (response.ok ? response.json() : null))
-      .then((data) => {
-        if (!cancelled && data?.alerts) setAlerts(data.alerts);
-      })
-      .catch(() => {
-        // History is a nicety; the live socket is what matters.
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    load();
+  }, [load]);
 
   useEffect(() => {
     const socket = io(BASE_URL, { transports: ["websocket"] });
@@ -43,5 +50,31 @@ export function useAlerts({ deviceId } = {}) {
     return () => socket.disconnect();
   }, [deviceId]);
 
-  return { alerts, connected };
+  /** Marks one alert acknowledged on the server, then locally. */
+  const acknowledge = useCallback(
+    async (alert) => {
+      const id = alert._id || alert.id;
+
+      if (!id) return;
+
+      try {
+        const response = await fetch(`${BASE_URL}/api/alerts/${id}/ack`, {
+          method: "PATCH",
+        });
+
+        if (!response.ok) return;
+
+        setAlerts((previous) =>
+          previous.map((item) =>
+            (item._id || item.id) === id ? { ...item, acknowledged: true } : item
+          )
+        );
+      } catch {
+        // Leave the row as it was; the next refresh will correct it.
+      }
+    },
+    []
+  );
+
+  return { alerts, connected, acknowledge, refresh: load };
 }

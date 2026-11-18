@@ -306,7 +306,7 @@ cd client && npm run dev
 | POST | `/api/compiler/parse` | Validate a graph and report the execution plan, without running it |
 | POST | `/api/compiler/execute` | Compile and run a graph against sample readings |
 | GET/POST/PUT/DELETE | `/api/pipelines` | Saved pipeline CRUD, each with a `running` flag |
-| GET | `/api/alerts` | Alert history, newest first |
+| GET | `/api/alerts` | Alert history, newest first; filters: `limit`, `ruleId`, `acknowledged` |
 | PATCH | `/api/alerts/:id/ack` | Acknowledge an alert |
 
 `GET /api/health` returns `503` when MongoDB is disconnected, so it is safe to use
@@ -377,6 +377,13 @@ When a rule's alert node matches, the registry hands the alert to
 `services/alertService`, which stores it in the `alerts` collection and broadcasts
 it. `POST /api/compiler/execute` passes no alert handler, so a dry run never
 writes an alert.
+
+### Dashboard
+
+The client shows three live views, all fed by what the API already exposes: a
+telemetry chart for the selected device (Socket.IO `telemetry`), a device rollup
+from `/api/telemetry/stats` where clicking a card switches the chart, and the alert
+feed with an All / Unacknowledged filter and per-alert acknowledge.
 
 ### End-to-end check
 

@@ -7,8 +7,19 @@ const {
 const alerts = new AlertService();
 
 async function listAlerts(req, res) {
+  const { limit, ruleId, acknowledged } = req.query;
+
+  // A typo like ?acknowledged=yes would otherwise filter on nothing and quietly
+  // return every alert.
+  if (acknowledged !== undefined && !["true", "false"].includes(acknowledged)) {
+    return res.status(400).json({
+      success: false,
+      message: 'acknowledged must be "true" or "false"',
+    });
+  }
+
   try {
-    const records = await alerts.list({ limit: req.query.limit });
+    const records = await alerts.list({ limit, ruleId, acknowledged });
 
     return res.status(200).json({
       success: true,

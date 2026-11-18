@@ -35,13 +35,20 @@ class AlertService {
     return plain;
   }
 
-  async list({ limit = 50 } = {}) {
+  async list({ limit = 50, ruleId, acknowledged } = {}) {
     const requested = Number(limit);
     const capped = Number.isFinite(requested)
       ? Math.min(Math.max(Math.trunc(requested), 1), 500)
       : 50;
 
-    return Alert.find().sort({ at: -1 }).limit(capped).lean();
+    const query = {};
+
+    if (ruleId) query.ruleId = String(ruleId);
+
+    if (acknowledged === "true") query.acknowledged = true;
+    if (acknowledged === "false") query.acknowledged = false;
+
+    return Alert.find(query).sort({ at: -1 }).limit(capped).lean();
   }
 
   async acknowledge(id) {
