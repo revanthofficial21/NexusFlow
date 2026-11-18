@@ -1,4 +1,3 @@
-
 import FlowCanvas from "./components/graph/FlowCanvas";
 import "./App.css";
 
