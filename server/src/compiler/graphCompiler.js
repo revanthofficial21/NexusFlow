@@ -93,6 +93,72 @@ function topologicalOrder(nodes, edges) {
  * A graph is a DAG, not a chain: one sensor can feed several branches, and a node
  * can combine several inputs.
  */
+/**
+ * Parameter resolution, shared by describeGraph and compileGraph.
+ *
+ * These live here rather than inside compileGraph because the parse endpoint used
+ * to report a graph as valid - windowSize 50,000, operator "roughly", url
+ * "not-a-url" - and then /execute rejected the same graph with a 400. Parsing and
+ * executing have to agree on what a node's settings mean.
+ */
+function resolveWindow(settings = {}) {
+  const raw = Number(settings.windowSize);
+  const windowSize = Number.isFinite(raw) ? Math.trunc(raw) : 5;
+
+  if (windowSize < 1 || windowSize > MAX_WINDOW) {
+    throw graphError(
+      `Window size must be between 1 and ${MAX_WINDOW}, received "${settings.windowSize}"`
+    );
+  }
+
+  return windowSize;
+}
+
+function resolveThreshold(settings = {}) {
+  const raw = settings.threshold;
+  const threshold =
+    raw === null || raw === undefined || raw === "" ? 80 : Number(raw);
+
+  if (!Number.isFinite(threshold)) {
+    throw graphError(`Threshold value must be a number, received "${raw}"`);
+  }
+
+  const operator = settings.operator || "greaterThan";
+  const comparators = {
+    greaterThan: (value) => value > threshold,
+    lessThan: (value) => value < threshold,
+    equal: (value) => Math.abs(value - threshold) < 1e-9,
+  };
+
+  const compare = comparators[operator];
+
+  if (!compare) {
+    throw graphError(`Unsupported threshold operator: ${operator}`);
+  }
+
+  return { threshold, operator, compare };
+}
+
+function resolveWebhook(settings = {}, nodeId = "?") {
+  const url = String(settings.url || "").trim();
+
+  if (!/^https?:\/\//i.test(url)) {
+    throw graphError(
+      `Webhook node ${nodeId} needs an http(s) URL, received "${settings.url ?? ""}"`
+    );
+  }
+
+  const method = String(settings.method || "POST").toUpperCase();
+
+  if (!WEBHOOK_METHODS.includes(method)) {
+    throw graphError(
+      `Webhook method must be one of ${WEBHOOK_METHODS.join(", ")}, received "${settings.method}"`
+    );
+  }
+
+  return { url, method };
+}
+
 function analyseGraph(graph) {
   const validation = validateGraph(graph);
 
@@ -106,6 +172,16 @@ function analyseGraph(graph) {
 
   if (sensors.length === 0) {
     throw graphError("Graph must contain a sensor node");
+  }
+
+  // Every sensor node reads the same input stream, so two of them silently
+  // duplicated every reading (one point in, two alerts out). Reading two devices
+  // in one rule is not supported yet, and guessing would be worse than saying so.
+  if (sensors.length > 1) {
+    throw graphError(
+      `Graph must contain exactly one sensor node, found ${sensors.length}: ` +
+        sensors.map((node) => node.id).join(", ")
+    );
   }
 
   const order = topologicalOrder(nodes, edges);
@@ -155,21 +231,17 @@ function describeGraph(graph) {
         return { ...wiring, deviceId: settings.deviceId ?? null };
 
       case "average":
-        return { ...wiring, windowSize: settings.windowSize ?? 5 };
+        return { ...wiring, windowSize: resolveWindow(settings) };
 
-      case "threshold":
-        return {
-          ...wiring,
-          operator: settings.operator ?? "greaterThan",
-          threshold: settings.threshold ?? 80,
-        };
+      case "threshold": {
+        const { threshold, operator } = resolveThreshold(settings);
+        return { ...wiring, operator, threshold };
+      }
 
-      case "webhook":
-        return {
-          ...wiring,
-          url: settings.url ?? null,
-          method: settings.method ?? "POST",
-        };
+      case "webhook": {
+        const { url, method } = resolveWebhook(settings, node.id);
+        return { ...wiring, url, method };
+      }
 
       default:
         return wiring;
@@ -236,14 +308,7 @@ function compileGraph(graph, sensorData$, options = {}) {
         break;
 
       case "average": {
-        const rawWindow = Number(settings.windowSize);
-        const windowSize = Number.isFinite(rawWindow) ? Math.trunc(rawWindow) : 5;
-
-        if (windowSize < 1 || windowSize > MAX_WINDOW) {
-          throw graphError(
-            `Window size must be between 1 and ${MAX_WINDOW}, received "${settings.windowSize}"`
-          );
-        }
+        const windowSize = resolveWindow(settings);
 
         stream = inputFor(id).pipe(
           bufferCount(windowSize, 1),
@@ -258,47 +323,14 @@ function compileGraph(graph, sensorData$, options = {}) {
       }
 
       case "threshold": {
-        const raw = settings.threshold;
-        const configured =
-          raw === null || raw === undefined || raw === "" ? 80 : Number(raw);
-
-        if (!Number.isFinite(configured)) {
-          throw graphError(`Threshold value must be a number, received "${raw}"`);
-        }
-
-        const operator = settings.operator || "greaterThan";
-        const comparators = {
-          greaterThan: (value) => value > configured,
-          lessThan: (value) => value < configured,
-          equal: (value) => Math.abs(value - configured) < 1e-9,
-        };
-
-        const compare = comparators[operator];
-
-        if (!compare) {
-          throw graphError(`Unsupported threshold operator: ${operator}`);
-        }
+        const { compare } = resolveThreshold(settings);
 
         stream = inputFor(id).pipe(filter((value) => compare(value)));
         break;
       }
 
       case "webhook": {
-        const url = String(settings.url || "").trim();
-
-        if (!/^https?:\/\//i.test(url)) {
-          throw graphError(
-            `Webhook node ${node.id} needs an http(s) URL, received "${settings.url ?? ""}"`
-          );
-        }
-
-        const method = String(settings.method || "POST").toUpperCase();
-
-        if (!WEBHOOK_METHODS.includes(method)) {
-          throw graphError(
-            `Webhook method must be one of ${WEBHOOK_METHODS.join(", ")}, received "${settings.method}"`
-          );
-        }
+        const { url, method } = resolveWebhook(settings, node.id);
 
         stream = inputFor(id).pipe(
           tap((value) => {

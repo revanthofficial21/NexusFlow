@@ -180,6 +180,59 @@ assert.deepStrictEqual(
 );
 console.log("Test 16 passed: an unreachable webhook does not break the stream");
 
+// 10b. Parse and execute must agree on parameters ----------------------------
+const { describeGraph } = require("../src/compiler/graphCompiler");
+
+const withWindow = (windowSize) => ({
+  nodes: [node("1", "sensor"), node("2", "average", { windowSize }), node("3", "alert")],
+  edges: chain(node("1", "sensor"), node("2", "average"), node("3", "alert")),
+});
+
+expectThrow(
+  () => describeGraph(withWindow(50000)),
+  /Window size must be between/,
+  "parse rejects an out-of-range window"
+);
+expectThrow(
+  () => run(withWindow(50000), [1]),
+  /Window size must be between/,
+  "execute rejects the same window"
+);
+
+const badOperatorGraph = {
+  nodes: [node("1", "sensor"), node("2", "threshold", { threshold: 5, operator: "roughly" }), node("3", "alert")],
+  edges: chain(node("1", "sensor"), node("2", "threshold"), node("3", "alert")),
+};
+expectThrow(
+  () => describeGraph(badOperatorGraph),
+  /Unsupported threshold operator/,
+  "parse rejects an unknown operator"
+);
+
+const badUrlGraph = {
+  nodes: [node("1", "sensor"), node("2", "webhook", { url: "not-a-url" })],
+  edges: chain(node("1", "sensor"), node("2", "webhook")),
+};
+expectThrow(
+  () => describeGraph(badUrlGraph),
+  /needs an http\(s\) URL/,
+  "parse rejects an invalid webhook URL"
+);
+
+// 10c. Two sensors would each read the same stream and duplicate every reading --
+const twoSensors = {
+  nodes: [node("1", "sensor", { deviceId: "a" }), node("2", "sensor", { deviceId: "b" }), node("3", "alert")],
+  edges: [
+    { id: "a", source: "1", target: "3" },
+    { id: "b", source: "2", target: "3" },
+  ],
+};
+expectThrow(
+  () => run(twoSensors, [1, 2]),
+  /exactly one sensor node/,
+  "two sensors are rejected rather than duplicating readings"
+);
+
 // 11. The compiler needs a real stream --------------------------------------
 expectThrow(
   () => compileGraph(cleared),

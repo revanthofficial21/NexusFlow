@@ -304,6 +304,30 @@ const server = app.listen(0, async () => {
     assert.deepStrictEqual([...body.results].sort((a, b) => a - b), [10, 15, 20]);
     console.log("Test 20 passed: a branching graph executes both branches");
 
+    // 17. Parse applies the same parameter rules as execute.
+    res = await fetch(`${base}/api/compiler/parse`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        graph: {
+          nodes: [
+            { id: "1", type: "sensor", data: {} },
+            { id: "2", type: "average", data: { windowSize: 50000 } },
+            { id: "3", type: "alert", data: {} },
+          ],
+          edges: [
+            { id: "a", source: "1", target: "2" },
+            { id: "b", source: "2", target: "3" },
+          ],
+        },
+      }),
+    });
+    body = await res.json();
+
+    assert.strictEqual(res.status, 400);
+    assert.match(body.message, /Window size must be between/);
+    console.log("Test 21 passed: parse rejects an out-of-range window, like execute does");
+
     console.log("\nAll HTTP tests passed!");
   } catch (error) {
     console.error("HTTP test failed:", error.message);
