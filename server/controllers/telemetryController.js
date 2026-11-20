@@ -188,6 +188,7 @@ module.exports = {
   getLatestTelemetry,
   getTelemetryStats,
   bulkReceiveTelemetry,
+  getTelemetryHistory
 };
 
 
@@ -250,3 +251,119 @@ async function bulkReceiveTelemetry(req, res) {
   }
 }
 
+
+
+// 5. Paginated telemetry history
+async function getTelemetryHistory(req, res) {
+  try {
+    const db = mongoose.connection.db;
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 100);
+    const skip = (page - 1) * limit;
+
+    const filter = {};
+    if (req.query.deviceId) {
+      filter["metadata.deviceId"] = req.query.deviceId;
+    }
+
+    const collection = db.collection("telemetry");
+    const [records, totalRecords] = await Promise.all([
+      collection.find(filter).sort({ timestamp: -1 }).skip(skip).limit(limit).toArray(),
+      collection.countDocuments(filter),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      pagination: {
+        currentPage: page,
+        limit,
+        totalRecords,
+        totalPages: Math.ceil(totalRecords / limit),
+      },
+      data: records,
+    });
+  } catch (error) {
+    console.error("Telemetry history error:", error.message);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch telemetry history",
+    });
+  }
+}
+
+
+
+async function getDeviceStatus(req, res) {
+  try {
+    const minutes = Math.min(Math.max(Number(req.query.minutes) || 5, 1), 1440);
+    const cutoff = new Date(Date.now() - minutes * 60 * 1000);
+
+    const devices = await mongoose.connection.db.collection("telemetry").aggregate([
+      { $sort: { timestamp: -1 } },
+      {
+        $group: {
+          _id: "$metadata.deviceId",
+          deviceType: { $first: "$metadata.deviceType" },
+          location: { $first: "$metadata.location" },
+          lastSeen: { $first: "$timestamp" }
+        }
+      },
+      { $sort: { lastSeen: -1 } }
+    ]).toArray();
+
+    const data = devices.map(device => ({
+      ...device,
+      status: device.lastSeen >= cutoff ? "online" : "offline"
+    }));
+
+    res.status(200).json({
+      success: true,
+      onlineCount: data.filter(d => d.status === "online").length,
+      offlineCount: data.filter(d => d.status === "offline").length,
+      data
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch device status"
+    });
+  }
+}
+
+
+
+
+module.exports.getDeviceStatus = getDeviceStatus;
+
+
+async function getTelemetryAlerts(req, res) {
+  try {
+    const temperatureLimit = Number(req.query.temperatureLimit) || 40;
+    const humidityLimit = Number(req.query.humidityLimit) || 80;
+
+    const alerts = await mongoose.connection.db.collection("telemetry")
+      .find({
+        $or: [
+          { "readings.temperature": { $gt: temperatureLimit } },
+          { "readings.humidity": { $gt: humidityLimit } }
+        ]
+      })
+      .sort({ timestamp: -1 })
+      .limit(100)
+      .toArray();
+
+    res.status(200).json({
+      success: true,
+      alertCount: alerts.length,
+      thresholds: { temperatureLimit, humidityLimit },
+      data: alerts
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch telemetry alerts"
+    });
+  }
+}
+
+module.exports.getTelemetryAlerts = getTelemetryAlerts;
