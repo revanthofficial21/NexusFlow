@@ -112,10 +112,37 @@ function App() {
     }
   }, [fetchSavedPipelines]);
 
-  // Automatically fetch pipelines when dashboard opens
+  // Fetch the saved pipelines once on mount. State is set after the await, not
+  // synchronously in the effect body, which would cascade renders.
   useEffect(() => {
-    loadSavedPipelines();
-  }, [loadSavedPipelines]);
+    let cancelled = false;
+
+    const loadOnMount = async () => {
+      try {
+        const result = await getPipelines();
+
+        if (cancelled) return;
+
+        setSavedPipelines(result.pipelines || []);
+        setBackendConnected(true);
+      } catch (error) {
+        if (cancelled) return;
+
+        setBackendConnected(false);
+        setPipelineError(
+          error.response?.data?.message ||
+            error.message ||
+            "Unable to retrieve saved pipelines."
+        );
+      }
+    };
+
+    loadOnMount();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Save a new pipeline
   const handleSavePipeline = async () => {

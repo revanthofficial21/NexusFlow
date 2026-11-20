@@ -32,9 +32,34 @@ export function useAlerts({ deviceId, acknowledged } = {}) {
     }
   }, [acknowledged]);
 
+  // State is set only after the await, never synchronously in the effect body.
   useEffect(() => {
-    load();
-  }, [load]);
+    let cancelled = false;
+
+    const fetchHistory = async () => {
+      const params = new URLSearchParams({ limit: String(MAX_ALERTS) });
+
+      if (acknowledged) params.set("acknowledged", acknowledged);
+
+      try {
+        const response = await fetch(`${BASE_URL}/api/alerts?${params}`);
+
+        if (cancelled || !response.ok) return;
+
+        const data = await response.json();
+
+        if (!cancelled) setAlerts(data.alerts || []);
+      } catch {
+        // History is a nicety; the live socket is what matters.
+      }
+    };
+
+    fetchHistory();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [acknowledged]);
 
   useEffect(() => {
     const socket = io(BASE_URL, { transports: ["websocket"] });

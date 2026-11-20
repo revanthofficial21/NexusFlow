@@ -12,12 +12,12 @@ const MAX_POINTS = 60;
  * device filter is repeated client-side as a guard against a stale room.
  */
 export function useTelemetry({ deviceId } = {}) {
-  const [points, setPoints] = useState([]);
+  // The device id travels with the buffer, so switching devices shows an empty
+  // chart without a setState in the effect body (which causes cascading renders).
+  const [buffer, setBuffer] = useState({ deviceId: null, points: [] });
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    setPoints([]);
-
     if (!deviceId) return undefined;
 
     const socket = io(BASE_URL, { transports: ["websocket"] });
@@ -32,17 +32,22 @@ export function useTelemetry({ deviceId } = {}) {
     socket.on("telemetry", (event) => {
       if (event?.deviceId !== deviceId) return;
 
-      setPoints((previous) => [
-        ...previous.slice(-MAX_POINTS + 1),
-        {
-          time: new Date(event.timestamp).toLocaleTimeString(),
-          value: event.value,
-        },
-      ]);
+      const point = {
+        time: new Date(event.timestamp).toLocaleTimeString(),
+        value: event.value,
+      };
+
+      setBuffer((previous) =>
+        previous.deviceId === deviceId
+          ? { deviceId, points: [...previous.points.slice(-MAX_POINTS + 1), point] }
+          : { deviceId, points: [point] }
+      );
     });
 
     return () => socket.disconnect();
   }, [deviceId]);
+
+  const points = buffer.deviceId === deviceId ? buffer.points : [];
 
   return { points, connected };
 }

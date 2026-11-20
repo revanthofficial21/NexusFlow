@@ -34,8 +34,16 @@ function TelemetryDashboard() {
         if (!active) return;
 
         const records = [...data.records].reverse();
+        const latest = records[records.length - 1] || null;
 
-        setRecord(records[records.length - 1] || null);
+        // Liveness is decided here, where a clock reading is allowed, and stored
+        // with the record.
+        const online = Boolean(
+          latest?.timestamp &&
+            Date.now() - new Date(latest.timestamp).getTime() <= 60000
+        );
+
+        setRecord(latest ? { ...latest, online } : null);
 
         setHistory(
           records
@@ -65,9 +73,9 @@ function TelemetryDashboard() {
   const temperature = record?.readings?.temperature;
   const humidity = record?.readings?.humidity;
   const pressure = record?.readings?.pressure;
-  const deviceOnline =
-  record?.timestamp &&
-  Date.now() - new Date(record.timestamp).getTime() <= 60000;
+  // Computed when the data arrives, not during render: Date.now() in render makes
+  // the component impure and the linter rejects it.
+  const deviceOnline = Boolean(record?.online);
 
   const readings = [
     {
