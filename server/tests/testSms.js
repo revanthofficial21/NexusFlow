@@ -89,6 +89,32 @@ async function main() {
   assert.deepStrictEqual(dry, []);
   console.log("Test 6 passed: a dry run sends no SMS and reports nothing");
 
+  // 7. One reading must not send two messages when the sms node feeds two
+  // downstream nodes: each consumer subscribes, so the tap used to run twice.
+  const shared = {
+    nodes: [
+      { id: "1", type: "sensor", data: { deviceId: "turbine-01" } },
+      { id: "2", type: "sms", data: { to: "+919876543210", template: "v={{value}}" } },
+      { id: "3", type: "alert", data: { label: "A" } },
+      { id: "4", type: "alert", data: { label: "B" } },
+    ],
+    edges: [
+      { id: "a", source: "1", target: "2" },
+      { id: "b", source: "2", target: "3" },
+      { id: "c", source: "2", target: "4" },
+    ],
+  };
+
+  const fanout = [];
+  compileGraph(shared, of(92), { live: true, onAlert: (alert) => fanout.push(alert) }).subscribe();
+
+  await wait();
+
+  const smsAlerts = fanout.filter((alert) => alert.channel === "sms");
+  assert.strictEqual(smsAlerts.length, 1, `expected one SMS, got ${smsAlerts.length}`);
+  assert.strictEqual(fanout.filter((alert) => !alert.channel).length, 2, "both alerts still fire");
+  console.log("Test 7 passed: one reading sends one SMS even with two downstream nodes");
+
   console.log("\nAll SMS tests passed!");
 }
 

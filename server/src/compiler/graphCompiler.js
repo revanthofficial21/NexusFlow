@@ -17,6 +17,30 @@ const {
 const MAX_WINDOW = 1000;
 const WEBHOOK_TIMEOUT_MS = 3000;
 const WEBHOOK_METHODS = ["POST", "PUT", "PATCH"];
+const SIDE_EFFECT_WINDOW_MS = 250;
+
+/**
+ * Collapses a repeated value inside a short window.
+ *
+ * A node with two downstream consumers is subscribed twice - once per consumer -
+ * so its tap ran twice for the same reading and a single anomaly sent two SMS
+ * messages (or two webhook POSTs). The guard is per node and per value, so distinct
+ * readings still go out.
+ */
+function createSideEffectGuard(windowMs = SIDE_EFFECT_WINDOW_MS) {
+  let lastValue;
+  let lastAt = 0;
+
+  return function shouldFire(value) {
+    const now = Date.now();
+
+    if (value === lastValue && now - lastAt < windowMs) return false;
+
+    lastValue = value;
+    lastAt = now;
+    return true;
+  };
+}
 
 /**
  * Fire-and-forget delivery. A failing webhook must never break the pipeline, so
@@ -362,10 +386,11 @@ function compileGraph(graph, sensorData$, options = {}) {
 
       case "webhook": {
         const { url, method } = resolveWebhook(settings, node.id);
+        const shouldFire = createSideEffectGuard();
 
         stream = inputFor(id).pipe(
           tap((value) => {
-            if (!live) return;
+            if (!live || !shouldFire(value)) return;
 
             void deliverWebhook(url, method, {
               node: node.id,
@@ -379,10 +404,11 @@ function compileGraph(graph, sensorData$, options = {}) {
 
       case "sms": {
         const { to, template } = resolveSms(settings, node.id);
+        const shouldFire = createSideEffectGuard();
 
         stream = inputFor(id).pipe(
           tap((value) => {
-            if (!live) return;
+            if (!live || !shouldFire(value)) return;
 
             const message = renderTemplate(template, { deviceId, value });
 
