@@ -799,3 +799,25 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
+
+/* View switch between the rule builder and the dashboard */
+.view-switch {
+  display: flex;
+  gap: 8px;
+}
+
+.view-switch button {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.view-switch button.active {
+  border-color: #38bdf8;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.08);
+}

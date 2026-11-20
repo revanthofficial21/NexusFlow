@@ -5,6 +5,7 @@ import FlowCanvas from "./components/graph/FlowCanvas";
 import { executeGraph } from "./services/compilerService";
 import { serializeGraph } from "./services/graphService";
 import { useAlerts } from "./hooks/useAlerts";
+import TelemetryDashboard from "./components/telemetry/TelemetryDashboard";
 import { useTelemetry } from "./hooks/useTelemetry";
 import { useEdgeActivity } from "./hooks/useEdgeActivity";
 import TelemetryChart from "./components/TelemetryChart";
@@ -50,6 +51,10 @@ function App() {
   const [executionResult, setExecutionResult] = useState(null);
   const [executionError, setExecutionError] = useState("");
   const [backendConnected, setBackendConnected] = useState(false);
+
+  // Two views: the rule builder, and the telemetry dashboard that arrived from
+  // Vivek's branch.
+  const [view, setView] = useState("builder");
 
   // Live rule matches, pushed over Socket.IO. "" = every alert, "false" = only
   // the ones nobody has acknowledged yet.
@@ -426,12 +431,33 @@ function App() {
           {/* Page Heading */}
           <div className="page-heading">
             <div>
-              <h1>Visual Rule Builder</h1>
+              <h1>{view === "builder" ? "Visual Rule Builder" : "Telemetry Dashboard"}</h1>
               <p>
-                Build and manage your IoT data pipelines visually.
+                {view === "builder"
+                  ? "Build and manage your IoT data pipelines visually."
+                  : "Live readings from the Turbine sensor."}
               </p>
             </div>
+
+            <div className="view-switch">
+              <button
+                className={view === "builder" ? "active" : ""}
+                onClick={() => setView("builder")}
+              >
+                Rule builder
+              </button>
+              <button
+                className={view === "dashboard" ? "active" : ""}
+                onClick={() => setView("dashboard")}
+              >
+                Dashboard
+              </button>
+            </div>
           </div>
+
+          {view === "dashboard" && <TelemetryDashboard />}
+
+          <div style={{ display: view === "builder" ? "block" : "none" }}>
 
           {/* Live telemetry */}
           <section className="live-panel">
@@ -731,6 +757,7 @@ function App() {
             )}
           </section>
 
+          </div>
         </main>
       </div>
     </div>
