@@ -1,4 +1,4 @@
-﻿
+
 const mongoose = require("mongoose");
 
 // 1. Receive and store sensor telemetry
@@ -187,4 +187,66 @@ module.exports = {
   receiveTelemetry,
   getLatestTelemetry,
   getTelemetryStats,
+  bulkReceiveTelemetry,
 };
+
+
+// 4. Bulk telemetry ingestion
+async function bulkReceiveTelemetry(req, res) {
+  try {
+    const { readings } = req.body;
+
+    if (!Array.isArray(readings) || readings.length === 0 || readings.length > 100) {
+      return res.status(400).json({
+        success: false,
+        message: "Provide between 1 and 100 telemetry readings",
+      });
+    }
+
+    const documents = [];
+
+    for (const item of readings) {
+      const { deviceId, deviceType, location, temperature, humidity } = item;
+
+      if (
+        typeof deviceId !== "string" || !deviceId.trim() ||
+        typeof deviceType !== "string" || !deviceType.trim() ||
+        (temperature === undefined && humidity === undefined) ||
+        (temperature !== undefined && (typeof temperature !== "number" || !Number.isFinite(temperature))) ||
+        (humidity !== undefined && (typeof humidity !== "number" || !Number.isFinite(humidity)))
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Each reading must contain valid device details and at least one valid sensor value",
+        });
+      }
+
+      documents.push({
+        timestamp: new Date(),
+        metadata: {
+          deviceId: deviceId.trim(),
+          deviceType: deviceType.trim(),
+          location: location || "Unknown",
+        },
+        readings: { temperature, humidity },
+      });
+    }
+
+    const result = await mongoose.connection.db
+      .collection("telemetry")
+      .insertMany(documents);
+
+    return res.status(201).json({
+      success: true,
+      message: "Bulk telemetry saved successfully",
+      insertedCount: result.insertedCount,
+    });
+  } catch (error) {
+    console.error("Bulk telemetry error:", error.message);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to save bulk telemetry",
+    });
+  }
+}
+
