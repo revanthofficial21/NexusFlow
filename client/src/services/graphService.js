@@ -11,6 +11,7 @@ const NODE_FIELDS = {
   threshold: ["operator", "threshold", "label", "condition"],
   alert: ["label"],
   webhook: ["url", "method", "label"],
+  sms: ["to", "template", "label"],
 };
 
 export function serializeGraph(nodes = [], edges = []) {

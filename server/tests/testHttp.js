@@ -328,6 +328,45 @@ const server = app.listen(0, async () => {
     assert.match(body.message, /Window size must be between/);
     console.log("Test 21 passed: parse rejects an out-of-range window, like execute does");
 
+    // 18. The sms node is accepted, and its phone number is validated on parse.
+    res = await fetch(`${base}/api/compiler/parse`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        graph: {
+          nodes: [
+            { id: "1", type: "sensor", data: { deviceId: "turbine-01" } },
+            { id: "2", type: "sms", data: { to: "+919876543210", template: "Hot {{deviceId}}: {{value}}" } },
+          ],
+          edges: [{ id: "a", source: "1", target: "2" }],
+        },
+      }),
+    });
+    body = await res.json();
+
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(body.plan[1].to, "+919876543210");
+    console.log("Test 22 passed: parse accepts an sms node and reports its recipient");
+
+    res = await fetch(`${base}/api/compiler/parse`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        graph: {
+          nodes: [
+            { id: "1", type: "sensor", data: {} },
+            { id: "2", type: "sms", data: { to: "call-me" } },
+          ],
+          edges: [{ id: "a", source: "1", target: "2" }],
+        },
+      }),
+    });
+    body = await res.json();
+
+    assert.strictEqual(res.status, 400);
+    assert.match(body.message, /valid phone number/);
+    console.log("Test 23 passed: parse rejects an sms node with an invalid number");
+
     console.log("\nAll HTTP tests passed!");
   } catch (error) {
     console.error("HTTP test failed:", error.message);

@@ -431,6 +431,18 @@ POSTs (or PUTs/PATCHes) the matched value as JSON to a URL you configure. Delive
 is fire-and-forget with a 3 second timeout: a failing endpoint is logged and never
 stops the pipeline.
 
+**SMS**
+
+Texts a phone number through `services/smsProvider.js`. The default provider logs
+the message and reports success, so no account or credit is needed for the demo;
+set `SMS_PROVIDER=fail` to exercise the failure path. Templates support
+`{{deviceId}}`, `{{metric}}`, `{{value}}` and `{{time}}`. The delivery outcome is
+recorded on the alert, so the history shows whether the text actually went out.
+
+Outbound actions - webhook and SMS - only fire for a **live** pipeline. A dry run
+through `/api/compiler/execute` reports the results without posting or texting
+anybody.
+
 ## Example IoT Pipeline
 
 A sample turbine temperature monitoring workflow:

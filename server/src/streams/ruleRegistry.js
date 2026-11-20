@@ -84,6 +84,7 @@ class RuleRegistry {
         graph,
         liveSourceFor(this.bus, deviceId),
         {
+          live: true,
           onAlert: (alert) =>
             this.handleAlert({
               ...alert,

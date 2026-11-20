@@ -8,6 +8,11 @@ const {
 } = require("rxjs/operators");
 
 const { validateGraph } = require("./validateGraph");
+const {
+  sendSms,
+  renderTemplate,
+  isValidPhoneNumber,
+} = require("../services/smsProvider");
 
 const MAX_WINDOW = 1000;
 const WEBHOOK_TIMEOUT_MS = 3000;
@@ -139,6 +144,21 @@ function resolveThreshold(settings = {}) {
   return { threshold, operator, compare };
 }
 
+function resolveSms(settings = {}, nodeId = "?") {
+  const to = String(settings.to || "").trim();
+
+  if (!isValidPhoneNumber(to)) {
+    throw graphError(
+      `SMS node ${nodeId} needs a valid phone number, received "${settings.to ?? ""}"`
+    );
+  }
+
+  return {
+    to,
+    template: settings.template || "Anomaly on {{deviceId}}: {{value}}",
+  };
+}
+
 function resolveWebhook(settings = {}, nodeId = "?") {
   const url = String(settings.url || "").trim();
 
@@ -243,6 +263,11 @@ function describeGraph(graph) {
         return { ...wiring, url, method };
       }
 
+      case "sms": {
+        const { to, template } = resolveSms(settings, node.id);
+        return { ...wiring, to, template };
+      }
+
       default:
         return wiring;
     }
@@ -276,6 +301,12 @@ function compileGraph(graph, sensorData$, options = {}) {
   const onAlert = typeof options.onAlert === "function" ? options.onAlert : null;
   const onEdgeActivity =
     typeof options.onEdgeActivity === "function" ? options.onEdgeActivity : null;
+
+  // Side effects - an outbound webhook, an SMS - only happen for a live pipeline.
+  // A dry run through /api/compiler/execute must never POST to a customer's URL or
+  // text anybody, which is what it used to do.
+  const live = options.live === true;
+  const deviceId = analysis.sensorNode?.data?.deviceId ?? null;
 
   if (!sensorData$ || typeof sensorData$.subscribe !== "function") {
     throw graphError("A sensorData$ stream is required");
@@ -334,11 +365,50 @@ function compileGraph(graph, sensorData$, options = {}) {
 
         stream = inputFor(id).pipe(
           tap((value) => {
+            if (!live) return;
+
             void deliverWebhook(url, method, {
               node: node.id,
               value,
               at: new Date().toISOString(),
             });
+          })
+        );
+        break;
+      }
+
+      case "sms": {
+        const { to, template } = resolveSms(settings, node.id);
+
+        stream = inputFor(id).pipe(
+          tap((value) => {
+            if (!live) return;
+
+            const message = renderTemplate(template, { deviceId, value });
+
+            // Delivery is reported as an alert, so the outcome - delivered or not -
+            // lands in the alert history rather than only in a log line.
+            sendSms({ to, message })
+              .then((result) =>
+                onAlert?.({
+                  nodeId: node.id,
+                  value,
+                  message,
+                  channel: "sms",
+                  level: result.delivered ? "warn" : "critical",
+                  delivery: result,
+                })
+              )
+              .catch((error) =>
+                onAlert?.({
+                  nodeId: node.id,
+                  value,
+                  message,
+                  channel: "sms",
+                  level: "critical",
+                  delivery: { delivered: false, error: error.message },
+                })
+              );
           })
         );
         break;

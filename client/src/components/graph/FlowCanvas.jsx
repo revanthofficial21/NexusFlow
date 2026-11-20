@@ -73,6 +73,18 @@ function WebhookNode({ data }) {
   );
 }
 
+// SMS Node
+function SmsNode({ data }) {
+  return (
+    <div style={{ ...nodeStyle, background: "#047857" }}>
+      <Handle type="target" position={Position.Left} />
+      <div>📱 SMS</div>
+      <small>{data.label}</small>
+      <p>{data.to}</p>
+    </div>
+  );
+}
+
 // Alert Node
 function AlertNode({ data }) {
   return (
@@ -101,6 +113,7 @@ const nodeTypes = {
   threshold: ThresholdNode,
   alert: AlertNode,
   webhook: WebhookNode,
+  sms: SmsNode,
 };
 
 // Initial graph
@@ -187,6 +200,13 @@ const library = [
     description: "POST the value to a URL",
     icon: "🔗",
     color: "#9333ea",
+  },
+  {
+    type: "sms",
+    name: "SMS Alert",
+    description: "Text a phone number",
+    icon: "📱",
+    color: "#047857",
   },
 ];
 
@@ -306,6 +326,8 @@ export default function FlowCanvas({
               ? "New Condition"
               : item.type === "webhook"
               ? "New Webhook"
+              : item.type === "sms"
+              ? "New SMS"
               : "New Notification",
 
           value:
@@ -337,6 +359,13 @@ export default function FlowCanvas({
               : undefined,
 
           method: item.type === "webhook" ? "POST" : undefined,
+
+          to: item.type === "sms" ? "+919876543210" : undefined,
+
+          template:
+            item.type === "sms"
+              ? "Anomaly on {{deviceId}}: {{value}}"
+              : undefined,
         },
       };
 
@@ -522,6 +551,35 @@ export default function FlowCanvas({
 
               <small>
                 The matched value is sent as JSON when the rule fires.
+              </small>
+            </>
+          )}
+
+          {selectedNode?.type === "sms" && (
+            <>
+              <label>Phone number</label>
+
+              <input
+                type="tel"
+                value={selectedNode.data.to ?? ""}
+                placeholder="+919876543210"
+                onChange={(event) => updateNodeData("to", event.target.value)}
+              />
+
+              <label>Message template</label>
+
+              <input
+                type="text"
+                value={selectedNode.data.template ?? ""}
+                placeholder="Anomaly on {{deviceId}}: {{value}}"
+                onChange={(event) =>
+                  updateNodeData("template", event.target.value)
+                }
+              />
+
+              <small>
+                Placeholders: {"{{deviceId}}"}, {"{{metric}}"}, {"{{value}}"},
+                {" {{time}}"}.
               </small>
             </>
           )}

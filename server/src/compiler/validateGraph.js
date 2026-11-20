@@ -5,6 +5,7 @@ const SUPPORTED_NODE_TYPES = [
   "threshold",
   "alert",
   "webhook",
+  "sms",
 ];
 
 function validateGraph(graph) {

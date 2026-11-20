@@ -13,7 +13,9 @@ const alertSchema = new mongoose.Schema(
       enum: ["info", "warn", "critical"],
       default: "warn",
     },
-    channel: { type: String, default: "socket" },
+    channel: { type: String, enum: ["socket", "sms", "webhook"], default: "socket" },
+    // Provider response for an action node: delivered, messageId, error.
+    delivery: { type: mongoose.Schema.Types.Mixed },
     acknowledged: { type: Boolean, default: false },
     at: { type: Date, default: () => new Date(), required: true },
   },

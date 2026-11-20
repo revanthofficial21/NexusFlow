@@ -26,6 +26,7 @@ class AlertService {
       message: alert.message,
       level: alert.level || "warn",
       channel: alert.channel || "socket",
+      delivery: alert.delivery,
       at: alert.at || new Date(),
     });
 
