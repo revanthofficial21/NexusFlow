@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import {
   ReactFlow,
   Background,
@@ -13,19 +13,35 @@ import {
 
 import "@xyflow/react/dist/style.css";
 
+// Common node styling
 const nodeStyle = {
   borderRadius: "12px",
   padding: "15px",
   minWidth: "165px",
-  color: "#fff",
+  color: "#ffffff",
   fontWeight: "600",
   border: "1px solid #475569",
 };
 
+// Common connection handle styling
+const handleStyle = {
+  width: 12,
+  height: 12,
+  background: "#ffffff",
+  border: "2px solid #9333ea",
+  borderRadius: "50%",
+};
+
+// Sensor Node
 function SensorNode({ data }) {
   return (
     <div style={{ ...nodeStyle, background: "#1d4ed8" }}>
-      <Handle type="source" position={Position.Right} />
+      <Handle
+        type="source"
+        position={Position.Right}
+        style={handleStyle}
+      />
+
       <div>🌡️ Data Source</div>
       <small>{data.label}</small>
       <p>{data.value}</p>
@@ -33,33 +49,66 @@ function SensorNode({ data }) {
   );
 }
 
+// Average Node
 function AverageNode({ data }) {
   return (
     <div style={{ ...nodeStyle, background: "#0f766e" }}>
-      <Handle type="target" position={Position.Left} />
-      <Handle type="source" position={Position.Right} />
+      <Handle
+        type="target"
+        position={Position.Left}
+        style={handleStyle}
+      />
+
+      <Handle
+        type="source"
+        position={Position.Right}
+        style={handleStyle}
+      />
+
       <div>📈 Average</div>
       <small>{data.label}</small>
     </div>
   );
 }
 
+// Moving Average Node
 function MovingAverageNode({ data }) {
   return (
     <div style={{ ...nodeStyle, background: "#7c3aed" }}>
-      <Handle type="target" position={Position.Left} />
-      <Handle type="source" position={Position.Right} />
+      <Handle
+        type="target"
+        position={Position.Left}
+        style={handleStyle}
+      />
+
+      <Handle
+        type="source"
+        position={Position.Right}
+        style={handleStyle}
+      />
+
       <div>📊 Moving Average</div>
       <small>{data.label}</small>
     </div>
   );
 }
 
+// Threshold Node
 function ThresholdNode({ data }) {
   return (
     <div style={{ ...nodeStyle, background: "#b45309" }}>
-      <Handle type="target" position={Position.Left} />
-      <Handle type="source" position={Position.Right} />
+      <Handle
+        type="target"
+        position={Position.Left}
+        style={handleStyle}
+      />
+
+      <Handle
+        type="source"
+        position={Position.Right}
+        style={handleStyle}
+      />
+
       <div>⚙️ Threshold</div>
       <small>{data.label}</small>
       <p>{data.condition}</p>
@@ -67,26 +116,45 @@ function ThresholdNode({ data }) {
   );
 }
 
+// SMS Alert Node
 function AlertNode({ data }) {
   return (
     <div style={{ ...nodeStyle, background: "#be123c" }}>
-      <Handle type="target" position={Position.Left} />
+      <Handle
+        type="target"
+        position={Position.Left}
+        style={handleStyle}
+      />
+
       <div>🚨 SMS Alert</div>
       <small>{data.label}</small>
     </div>
   );
 }
 
+// Webhook Node
 function WebhookNode({ data }) {
   return (
     <div style={{ ...nodeStyle, background: "#9333ea" }}>
-      <Handle type="target" position={Position.Left} />
+      <Handle
+        type="target"
+        position={Position.Left}
+        style={handleStyle}
+      />
+
+      <Handle
+        type="source"
+        position={Position.Right}
+        style={handleStyle}
+      />
+
       <div>🔗 Webhook</div>
       <small>{data.label}</small>
     </div>
   );
 }
 
+// Node type registration
 const nodeTypes = {
   sensor: SensorNode,
   average: AverageNode,
@@ -96,6 +164,7 @@ const nodeTypes = {
   webhook: WebhookNode,
 };
 
+// Initial pipeline nodes
 const initialNodes = [
   {
     id: "1",
@@ -110,7 +179,9 @@ const initialNodes = [
     id: "2",
     type: "movingAverage",
     position: { x: 310, y: 150 },
-    data: { label: "Window: 5 samples" },
+    data: {
+      label: "Window: 5 samples",
+    },
   },
   {
     id: "3",
@@ -125,16 +196,35 @@ const initialNodes = [
     id: "4",
     type: "alert",
     position: { x: 830, y: 150 },
-    data: { label: "Manager Notification" },
+    data: {
+      label: "Manager Notification",
+    },
   },
 ];
 
+// Initial pipeline connections
 const initialEdges = [
-  { id: "e1-2", source: "1", target: "2", animated: true },
-  { id: "e2-3", source: "2", target: "3", animated: true },
-  { id: "e3-4", source: "3", target: "4", animated: true },
+  {
+    id: "e1-2",
+    source: "1",
+    target: "2",
+    animated: true,
+  },
+  {
+    id: "e2-3",
+    source: "2",
+    target: "3",
+    animated: true,
+  },
+  {
+    id: "e3-4",
+    source: "3",
+    target: "4",
+    animated: true,
+  },
 ];
 
+// Node library
 const library = [
   {
     type: "sensor",
@@ -180,6 +270,7 @@ const library = [
   },
 ];
 
+// Default data for each node
 function getNodeData(type) {
   switch (type) {
     case "sensor":
@@ -189,10 +280,14 @@ function getNodeData(type) {
       };
 
     case "average":
-      return { label: "Calculate Average" };
+      return {
+        label: "Calculate Average",
+      };
 
     case "movingAverage":
-      return { label: "Window: 5 samples" };
+      return {
+        label: "Window: 5 samples",
+      };
 
     case "threshold":
       return {
@@ -201,16 +296,23 @@ function getNodeData(type) {
       };
 
     case "alert":
-      return { label: "New Notification" };
+      return {
+        label: "New Notification",
+      };
 
     case "webhook":
-      return { label: "New Webhook Action" };
+      return {
+        label: "New Webhook Action",
+      };
 
     default:
-      return { label: "New Node" };
+      return {
+        label: "New Node",
+      };
   }
 }
 
+// Main Flow Canvas
 export default function FlowCanvas() {
   const [nodes, setNodes, onNodesChange] =
     useNodesState(initialNodes);
@@ -218,11 +320,24 @@ export default function FlowCanvas() {
   const [edges, setEdges, onEdgesChange] =
     useEdgesState(initialEdges);
 
+  const [showJSON, setShowJSON] = useState(false);
+
+  // Convert pipeline into JSON
+  const graphJSON = JSON.stringify(
+    { nodes, edges },
+    null,
+    2
+  );
+
+  // Handle node connections
   const onConnect = useCallback(
     (connection) => {
       setEdges((currentEdges) =>
         addEdge(
-          { ...connection, animated: true },
+          {
+            ...connection,
+            animated: true,
+          },
           currentEdges
         )
       );
@@ -230,6 +345,7 @@ export default function FlowCanvas() {
     [setEdges]
   );
 
+  // Add new node to canvas
   const addNode = useCallback(
     (item) => {
       const id = `node-${Date.now()}-${Math.floor(
@@ -240,8 +356,8 @@ export default function FlowCanvas() {
         id,
         type: item.type,
         position: {
-          x: 100 + (nodes.length % 3) * 100,
-          y: 350 + Math.floor(nodes.length / 3) * 120,
+          x: 80 + (nodes.length % 3) * 260,
+          y: 350 + Math.floor(nodes.length / 3) * 170,
         },
         data: getNodeData(item.type),
       };
@@ -254,10 +370,19 @@ export default function FlowCanvas() {
     [nodes.length, setNodes]
   );
 
+  // Reset pipeline
+  const resetCanvas = useCallback(() => {
+    setNodes(initialNodes);
+    setEdges(initialEdges);
+  }, [setNodes, setEdges]);
+
   return (
     <div className="flow-workspace">
+
+      {/* Node Library */}
       <aside className="node-library">
         <h3>NODE LIBRARY</h3>
+
         <p>Add components to your pipeline</p>
 
         {library.map((item) => (
@@ -284,6 +409,7 @@ export default function FlowCanvas() {
 
         <div className="library-tip">
           <strong>Tip</strong>
+
           <p>
             Add nodes and connect their handles to
             create your IoT data pipeline.
@@ -291,21 +417,27 @@ export default function FlowCanvas() {
         </div>
       </aside>
 
+      {/* Pipeline Canvas */}
       <div className="flow-canvas-area">
+
+        {/* Canvas Toolbar */}
         <div className="canvas-toolbar">
           <span>{nodes.length} Nodes</span>
+
           <span>{edges.length} Connections</span>
 
-          <button
-            onClick={() => {
-              setNodes(initialNodes);
-              setEdges(initialEdges);
-            }}
-          >
+          <button onClick={resetCanvas}>
             Reset Canvas
+          </button>
+
+          <button
+            onClick={() => setShowJSON((previous) => !previous)}
+          >
+            {showJSON ? "Hide Graph JSON" : "View Graph JSON"}
           </button>
         </div>
 
+        {/* React Flow */}
         <div className="flow-canvas">
           <ReactFlow
             nodes={nodes}
@@ -317,11 +449,36 @@ export default function FlowCanvas() {
             fitView
             deleteKeyCode={["Backspace", "Delete"]}
           >
-            <Background color="#64748b" gap={20} />
+            <Background
+              color="#64748b"
+              gap={20}
+            />
+
             <Controls />
+
             <MiniMap />
           </ReactFlow>
         </div>
+
+        {/* Graph JSON Preview */}
+        {showJSON && (
+          <pre
+            style={{
+              marginTop: "12px",
+              padding: "15px",
+              background: "#111827",
+              color: "#e5e7eb",
+              borderRadius: "8px",
+              maxHeight: "300px",
+              overflow: "auto",
+              fontSize: "12px",
+              whiteSpace: "pre-wrap",
+              overflowWrap: "anywhere",
+            }}
+          >
+            {graphJSON}
+          </pre>
+        )}
       </div>
     </div>
   );
