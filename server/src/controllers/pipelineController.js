@@ -34,7 +34,7 @@ function handleError(res, error, fallbackMessage) {
 // CREATE: Save a new pipeline
 const createPipeline = async (req, res) => {
   try {
-    const { name, description, nodes, edges } = req.body;
+    const { name, description, nodes, edges, enabled } = req.body;
 
     if (!name || !name.trim()) {
       return res.status(400).json({
@@ -62,6 +62,7 @@ const createPipeline = async (req, res) => {
     }
 
     const pipeline = await Pipeline.create({
+      enabled: enabled !== false,
       name: name.trim(),
       description: description || "",
       nodes,
@@ -94,10 +95,16 @@ const getPipelines = async (req, res) => {
     return res.status(200).json({
       success: true,
       count: pipelines.length,
-      pipelines: pipelines.map((pipeline) => ({
-        ...pipeline,
-        running: registry.status(pipeline._id).running,
-      })),
+      pipelines: pipelines.map((pipeline) => {
+        const status = registry.status(pipeline._id);
+
+        return {
+          ...pipeline,
+          running: status.running,
+          enabled: pipeline.enabled !== false,
+          suppressedAlerts: status.suppressedAlerts || 0,
+        };
+      }),
     });
   } catch (error) {
     return handleError(res, error, "Unable to retrieve pipelines");
@@ -116,9 +123,15 @@ const getPipelineById = async (req, res) => {
       });
     }
 
+    const status = getRegistry().status(pipeline._id);
+
     return res.status(200).json({
       success: true,
-      pipeline,
+      pipeline: {
+        ...pipeline.toObject(),
+        running: status.running,
+        suppressedAlerts: status.suppressedAlerts || 0,
+      },
     });
   } catch (error) {
     // Only a malformed ObjectId is the caller's fault; a dropped connection is not.
@@ -136,7 +149,7 @@ const getPipelineById = async (req, res) => {
 // UPDATE: Update an existing pipeline
 const updatePipeline = async (req, res) => {
   try {
-    const { name, description, nodes, edges } = req.body;
+    const { name, description, nodes, edges, enabled } = req.body;
 
     const updates = {};
 
@@ -172,6 +185,16 @@ const updatePipeline = async (req, res) => {
         });
       }
       updates.edges = edges;
+    }
+
+    if (enabled !== undefined) {
+      if (typeof enabled !== "boolean") {
+        return res.status(400).json({
+          success: false,
+          message: "enabled must be true or false",
+        });
+      }
+      updates.enabled = enabled;
     }
 
     // An empty body used to return 200 and change nothing, which reads as success.
@@ -213,7 +236,8 @@ const updatePipeline = async (req, res) => {
       req.params.id,
       updates,
       {
-        new: true,
+        // mongoose 9 deprecates `new`; returnDocument is the supported spelling.
+        returnDocument: "after",
         runValidators: true,
       }
     );

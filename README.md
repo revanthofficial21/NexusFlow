@@ -344,6 +344,12 @@ its sensor node's `deviceId`. Rules are recompiled at boot from MongoDB, so they
 survive a restart. `GET /api/pipelines` reports `running` per pipeline and
 `suppressedAlerts` for each.
 
+Pausing: `PUT /api/pipelines/:id` with `{"enabled": false}` stops a rule without
+deleting it - it keeps its graph and its alert history but holds no subscription, so
+it evaluates nothing until resumed. `GET /api/pipelines` reports `running`,
+`enabled` and `suppressedAlerts` per rule, and the dashboard's Pause / Resume button
+drives the same endpoint.
+
 Alert throttling: a rule records at most one alert per `ALERT_COOLDOWN_MS`
 (default 30s). Matches inside the window are counted, not silently dropped - the
 count shows up as `suppressedAlerts` in the pipeline status. Without it, a stream

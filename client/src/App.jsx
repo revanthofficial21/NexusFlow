@@ -41,6 +41,7 @@ function App() {
   // MongoDB pipeline state
   const [savedPipelines, setSavedPipelines] = useState([]);
   const [selectedPipelineId, setSelectedPipelineId] = useState("");
+  const [selectedPipeline, setSelectedPipeline] = useState(null);
 
   const [pipelineLoading, setPipelineLoading] = useState(false);
   const [pipelineMessage, setPipelineMessage] = useState("");
@@ -213,6 +214,7 @@ function App() {
         edges: pipeline.edges || [],
       };
 
+      setSelectedPipeline(pipeline);
       setPipelineName(pipeline.name);
       setPipelineDescription(pipeline.description || "");
 
@@ -277,6 +279,38 @@ function App() {
         error.response?.data?.message ||
           error.message ||
           "Unable to update pipeline."
+      );
+    } finally {
+      setPipelineLoading(false);
+    }
+  };
+
+  // Pause or resume the selected rule. A paused rule keeps its history and its
+  // graph but holds no subscription, so it evaluates nothing until resumed.
+  const handleToggleEnabled = async () => {
+    if (!selectedPipelineId) return;
+
+    const nextEnabled = selectedPipeline?.enabled === false;
+
+    try {
+      setPipelineLoading(true);
+      setPipelineError("");
+      setPipelineMessage("");
+
+      const result = await updatePipeline(selectedPipelineId, {
+        enabled: nextEnabled,
+      });
+
+      setPipelineMessage(
+        nextEnabled ? "Rule resumed." : "Rule paused."
+      );
+      await fetchSavedPipelines();
+      setSelectedPipeline(result.pipeline || null);
+    } catch (error) {
+      setPipelineError(
+        error.response?.data?.message ||
+          error.message ||
+          "Unable to change the rule state."
       );
     } finally {
       setPipelineLoading(false);
@@ -550,7 +584,12 @@ function App() {
               <select
                 value={selectedPipelineId}
                 onChange={(event) => {
-                  setSelectedPipelineId(event.target.value);
+                  const id = event.target.value;
+
+                  setSelectedPipelineId(id);
+                  setSelectedPipeline(
+                    savedPipelines.find((item) => item._id === id) || null
+                  );
                   setPipelineError("");
                   setPipelineMessage("");
                 }}
@@ -595,6 +634,16 @@ function App() {
                   }
                 >
                   ✏️ Update
+                </button>
+
+                <button
+                  onClick={handleToggleEnabled}
+                  disabled={
+                    pipelineLoading || !selectedPipelineId
+                  }
+                  title="A paused rule stays saved but evaluates nothing"
+                >
+                  {selectedPipeline?.enabled === false ? "▶️ Resume" : "⏸️ Pause"}
                 </button>
 
                 <button

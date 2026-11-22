@@ -367,6 +367,18 @@ const server = app.listen(0, async () => {
     assert.match(body.message, /valid phone number/);
     console.log("Test 23 passed: parse rejects an sms node with an invalid number");
 
+    // 19. enabled must be a boolean, checked before the database is touched.
+    res = await fetch(`${base}/api/pipelines/64b7f0c2f1a2b3c4d5e6f7a8`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ enabled: "yes" }),
+    });
+    body = await res.json();
+
+    assert.strictEqual(res.status, 400);
+    assert.match(body.message, /enabled must be true or false/);
+    console.log("Test 24 passed: a non-boolean enabled value is rejected with 400");
+
     console.log("\nAll HTTP tests passed!");
   } catch (error) {
     console.error("HTTP test failed:", error.message);

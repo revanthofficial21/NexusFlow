@@ -27,6 +27,13 @@ const pipelineSchema = new mongoose.Schema(
       type: [mongoose.Schema.Types.Mixed],
       default: [],
     },
+
+    // A paused rule stays saved and keeps its history, but holds no subscription,
+    // so it evaluates nothing until it is resumed.
+    enabled: {
+      type: Boolean,
+      default: true,
+    },
   },
   {
     timestamps: true,
@@ -35,6 +42,7 @@ const pipelineSchema = new mongoose.Schema(
 
 // Every list endpoint sorts by updatedAt.
 pipelineSchema.index({ updatedAt: -1 });
+pipelineSchema.index({ enabled: 1 });
 
 const Pipeline = mongoose.model("Pipeline", pipelineSchema);
 

@@ -175,6 +175,25 @@ async function main() {
       `got "${updated.body?.pipeline?.name}"`
     );
 
+    // Pause and resume - the lifecycle a manager actually uses.
+    const paused = await call("PUT", `/api/pipelines/${pipelineId}`, { enabled: false });
+    check(
+      "a rule can be paused",
+      paused.status === 200 && paused.body?.pipeline?.enabled === false,
+      `got ${paused.status}, enabled ${paused.body?.pipeline?.enabled}`
+    );
+
+    const listedAfterPause = await call("GET", "/api/pipelines");
+    const pausedEntry = (listedAfterPause.body?.pipelines || []).find((item) => item._id === pipelineId);
+    check("a paused rule reports running: false", pausedEntry?.running === false);
+
+    const resumed = await call("PUT", `/api/pipelines/${pipelineId}`, { enabled: true });
+    check(
+      "a paused rule can be resumed",
+      resumed.status === 200 && resumed.body?.pipeline?.enabled === true,
+      `got ${resumed.status}`
+    );
+
     const removed = await call("DELETE", `/api/pipelines/${pipelineId}`);
     check("DELETE /api/pipelines/:id returns 200", removed.status === 200, `got ${removed.status}`);
 

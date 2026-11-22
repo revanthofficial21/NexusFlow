@@ -76,6 +76,11 @@ class RuleRegistry {
 
     this.stop(id);
 
+    // A paused rule is saved but silent: no subscription, no evaluation.
+    if (document.enabled === false) {
+      return { id, running: false, enabled: false, reason: "paused" };
+    }
+
     try {
       const { sensorNode } = analyseGraph(graph);
       const deviceId = sensorNode?.data?.deviceId || null;
@@ -150,6 +155,7 @@ class RuleRegistry {
     return {
       id: String(id),
       running: true,
+      enabled: true,
       name: entry.name,
       deviceId: entry.deviceId,
       compiledAt: entry.compiledAt,
@@ -168,12 +174,13 @@ class RuleRegistry {
 
     const results = documents.map((document) => this.compile(document));
     const running = results.filter((result) => result.running).length;
+    const paused = results.filter((result) => result.enabled === false).length;
 
     this.logger.log(
-      `[registry] ${running}/${documents.length} saved pipeline(s) running`
+      `[registry] ${running}/${documents.length} saved pipeline(s) running, ${paused} paused`
     );
 
-    return { total: documents.length, running };
+    return { total: documents.length, running, paused };
   }
 }
 

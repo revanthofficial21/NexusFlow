@@ -81,8 +81,54 @@ async function main() {
   const bootRegistry = new RuleRegistry({ bus: new Subject(), logger: silentLogger });
   const result = await bootRegistry.bootstrap(fakeCollection);
 
-  assert.deepStrictEqual(result, { total: 1, running: 1 });
+  assert.deepStrictEqual(result, { total: 1, running: 1, paused: 0 });
   console.log("Test 7 passed: bootstrap compiles the saved pipelines");
+
+  // 8. A paused rule holds no subscription and evaluates nothing.
+  const pauseBus = new Subject();
+  const pauseRegistry = new RuleRegistry({ bus: pauseBus, logger: silentLogger });
+  const pausedAlerts = [];
+
+  pauseRegistry.setAlertHandler(async (alert) => pausedAlerts.push(alert.value));
+
+  const paused = pauseRegistry.compile({ ...document, _id: "rule-paused", name: "Paused", enabled: false });
+
+  assert.strictEqual(paused.running, false);
+  assert.strictEqual(paused.enabled, false);
+  assert.strictEqual(paused.reason, "paused");
+
+  pauseBus.next(point("turbine-01", 95));
+  await new Promise((resolve) => setTimeout(resolve, 20));
+
+  assert.strictEqual(pausedAlerts.length, 0, "a paused rule must not evaluate");
+  console.log("Test 8 passed: a paused rule holds no subscription and fires nothing");
+
+  // 9. Resuming compiles it and it starts evaluating again.
+  const resumed = pauseRegistry.compile({ ...document, _id: "rule-paused", name: "Paused", enabled: true });
+
+  assert.strictEqual(resumed.running, true);
+
+  // The chain averages pairs, so it needs two readings before the threshold sees
+  // anything: (96 + 97) / 2 = 96.5.
+  pauseBus.next(point("turbine-01", 96));
+  pauseBus.next(point("turbine-01", 97));
+  await new Promise((resolve) => setTimeout(resolve, 20));
+
+  assert.deepStrictEqual(pausedAlerts, [96.5], "the resumed rule evaluates again");
+  console.log("Test 9 passed: resuming a paused rule compiles it again");
+
+  // 10. Bootstrap reports how many were paused rather than running.
+  const summary = await pauseRegistry.bootstrap({
+    find: () => ({
+      lean: async () => [
+        { ...document, _id: "rule-a", name: "A", enabled: true },
+        { ...document, _id: "rule-b", name: "B", enabled: false },
+      ],
+    }),
+  });
+
+  assert.deepStrictEqual(summary, { total: 2, running: 1, paused: 1 });
+  console.log("Test 10 passed: bootstrap separates running from paused rules");
 
   console.log("\nAll live pipeline tests passed!");
 }
