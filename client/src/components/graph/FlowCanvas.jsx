@@ -1,3 +1,4 @@
+
 import { useCallback, useState } from "react";
 import {
   ReactFlow,
@@ -41,7 +42,6 @@ function SensorNode({ data }) {
         position={Position.Right}
         style={handleStyle}
       />
-
       <div>🌡️ Data Source</div>
       <small>{data.label}</small>
       <p>{data.value}</p>
@@ -58,13 +58,11 @@ function AverageNode({ data }) {
         position={Position.Left}
         style={handleStyle}
       />
-
       <Handle
         type="source"
         position={Position.Right}
         style={handleStyle}
       />
-
       <div>📈 Average</div>
       <small>{data.label}</small>
     </div>
@@ -80,13 +78,11 @@ function MovingAverageNode({ data }) {
         position={Position.Left}
         style={handleStyle}
       />
-
       <Handle
         type="source"
         position={Position.Right}
         style={handleStyle}
       />
-
       <div>📊 Moving Average</div>
       <small>{data.label}</small>
     </div>
@@ -102,13 +98,11 @@ function ThresholdNode({ data }) {
         position={Position.Left}
         style={handleStyle}
       />
-
       <Handle
         type="source"
         position={Position.Right}
         style={handleStyle}
       />
-
       <div>⚙️ Threshold</div>
       <small>{data.label}</small>
       <p>{data.condition}</p>
@@ -125,7 +119,6 @@ function AlertNode({ data }) {
         position={Position.Left}
         style={handleStyle}
       />
-
       <div>🚨 SMS Alert</div>
       <small>{data.label}</small>
     </div>
@@ -141,20 +134,18 @@ function WebhookNode({ data }) {
         position={Position.Left}
         style={handleStyle}
       />
-
       <Handle
         type="source"
         position={Position.Right}
         style={handleStyle}
       />
-
       <div>🔗 Webhook</div>
       <small>{data.label}</small>
     </div>
   );
 }
 
-// Node type registration
+// Register node types
 const nodeTypes = {
   sensor: SensorNode,
   average: AverageNode,
@@ -312,6 +303,30 @@ function getNodeData(type) {
   }
 }
 
+// Convert React Flow graph into a clean JSON structure
+function serializeGraph(nodes, edges) {
+  return {
+    nodes: nodes.map((node) => ({
+      id: node.id,
+      type: node.type,
+      position: {
+        x: node.position.x,
+        y: node.position.y,
+      },
+      data: { ...node.data },
+    })),
+
+    edges: edges.map((edge) => ({
+      id: edge.id,
+      source: edge.source,
+      target: edge.target,
+      sourceHandle: edge.sourceHandle ?? null,
+      targetHandle: edge.targetHandle ?? null,
+      animated: edge.animated ?? false,
+    })),
+  };
+}
+
 // Main Flow Canvas
 export default function FlowCanvas() {
   const [nodes, setNodes, onNodesChange] =
@@ -322,12 +337,37 @@ export default function FlowCanvas() {
 
   const [showJSON, setShowJSON] = useState(false);
 
-  // Convert pipeline into JSON
+  // Generate graph JSON
   const graphJSON = JSON.stringify(
-    { nodes, edges },
+    serializeGraph(nodes, edges),
     null,
     2
   );
+
+  // Download graph JSON
+  const downloadJSON = useCallback(() => {
+    const json = JSON.stringify(
+      serializeGraph(nodes, edges),
+      null,
+      2
+    );
+
+    const blob = new Blob([json], {
+      type: "application/json",
+    });
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = "nexusflow-pipeline.json";
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    URL.revokeObjectURL(url);
+  }, [nodes, edges]);
 
   // Handle node connections
   const onConnect = useCallback(
@@ -345,7 +385,7 @@ export default function FlowCanvas() {
     [setEdges]
   );
 
-  // Add new node to canvas
+  // Add new node
   const addNode = useCallback(
     (item) => {
       const id = `node-${Date.now()}-${Math.floor(
@@ -409,7 +449,6 @@ export default function FlowCanvas() {
 
         <div className="library-tip">
           <strong>Tip</strong>
-
           <p>
             Add nodes and connect their handles to
             create your IoT data pipeline.
@@ -423,15 +462,20 @@ export default function FlowCanvas() {
         {/* Canvas Toolbar */}
         <div className="canvas-toolbar">
           <span>{nodes.length} Nodes</span>
-
           <span>{edges.length} Connections</span>
 
           <button onClick={resetCanvas}>
             Reset Canvas
           </button>
 
+          <button onClick={downloadJSON}>
+            Download Graph JSON
+          </button>
+
           <button
-            onClick={() => setShowJSON((previous) => !previous)}
+            onClick={() =>
+              setShowJSON((previous) => !previous)
+            }
           >
             {showJSON ? "Hide Graph JSON" : "View Graph JSON"}
           </button>
@@ -455,7 +499,6 @@ export default function FlowCanvas() {
             />
 
             <Controls />
-
             <MiniMap />
           </ReactFlow>
         </div>
