@@ -1,4 +1,3 @@
-
 import { useCallback, useState } from "react";
 import {
   ReactFlow,
@@ -14,138 +13,117 @@ import {
 
 import "@xyflow/react/dist/style.css";
 
-// Common node styling
+// ------------------------------------
+// Shared node styles
+// ------------------------------------
+
 const nodeStyle = {
-  borderRadius: "12px",
-  padding: "15px",
-  minWidth: "165px",
-  color: "#ffffff",
-  fontWeight: "600",
+  minWidth: "170px",
+  padding: "14px",
+  borderRadius: "10px",
   border: "1px solid #475569",
+  background: "#1e293b",
+  color: "#f8fafc",
+  fontSize: "13px",
+  boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
 };
 
-// Common connection handle styling
-const handleStyle = {
-  width: 12,
-  height: 12,
-  background: "#ffffff",
-  border: "2px solid #9333ea",
-  borderRadius: "50%",
+const titleStyle = {
+  fontWeight: "700",
+  fontSize: "14px",
+  marginBottom: "7px",
 };
 
-// Sensor Node
+const descriptionStyle = {
+  color: "#cbd5e1",
+  fontSize: "11px",
+};
+
+// ------------------------------------
+// Custom Nodes
+// ------------------------------------
+
 function SensorNode({ data }) {
   return (
-    <div style={{ ...nodeStyle, background: "#1d4ed8" }}>
-      <Handle
-        type="source"
-        position={Position.Right}
-        style={handleStyle}
-      />
-      <div>🌡️ Data Source</div>
-      <small>{data.label}</small>
-      <p>{data.value}</p>
+    <div style={{ ...nodeStyle, borderColor: "#38bdf8" }}>
+      <Handle type="source" position={Position.Bottom} />
+      <div style={titleStyle}>🌡️ {data.label || "Data Source"}</div>
+      <div style={descriptionStyle}>
+        {data.description || "Receives sensor telemetry"}
+      </div>
     </div>
   );
 }
 
-// Average Node
 function AverageNode({ data }) {
   return (
-    <div style={{ ...nodeStyle, background: "#0f766e" }}>
-      <Handle
-        type="target"
-        position={Position.Left}
-        style={handleStyle}
-      />
-      <Handle
-        type="source"
-        position={Position.Right}
-        style={handleStyle}
-      />
-      <div>📈 Average</div>
-      <small>{data.label}</small>
+    <div style={{ ...nodeStyle, borderColor: "#a78bfa" }}>
+      <Handle type="target" position={Position.Top} />
+      <Handle type="source" position={Position.Bottom} />
+      <div style={titleStyle}>📊 {data.label || "Average"}</div>
+      <div style={descriptionStyle}>
+        {data.description || "Calculates average values"}
+      </div>
     </div>
   );
 }
 
-// Moving Average Node
 function MovingAverageNode({ data }) {
   return (
-    <div style={{ ...nodeStyle, background: "#7c3aed" }}>
-      <Handle
-        type="target"
-        position={Position.Left}
-        style={handleStyle}
-      />
-      <Handle
-        type="source"
-        position={Position.Right}
-        style={handleStyle}
-      />
-      <div>📊 Moving Average</div>
-      <small>{data.label}</small>
+    <div style={{ ...nodeStyle, borderColor: "#a78bfa" }}>
+      <Handle type="target" position={Position.Top} />
+      <Handle type="source" position={Position.Bottom} />
+      <div style={titleStyle}>
+        📈 {data.label || "Moving Average"}
+      </div>
+      <div style={descriptionStyle}>
+        {data.description || "Smooths incoming sensor values"}
+      </div>
     </div>
   );
 }
 
-// Threshold Node
 function ThresholdNode({ data }) {
   return (
-    <div style={{ ...nodeStyle, background: "#b45309" }}>
-      <Handle
-        type="target"
-        position={Position.Left}
-        style={handleStyle}
-      />
-      <Handle
-        type="source"
-        position={Position.Right}
-        style={handleStyle}
-      />
-      <div>⚙️ Threshold</div>
-      <small>{data.label}</small>
-      <p>{data.condition}</p>
+    <div style={{ ...nodeStyle, borderColor: "#facc15" }}>
+      <Handle type="target" position={Position.Top} />
+      <Handle type="source" position={Position.Bottom} />
+      <div style={titleStyle}>⚖️ {data.label || "Threshold"}</div>
+      <div style={descriptionStyle}>
+        {data.description || "Checks values against a limit"}
+      </div>
     </div>
   );
 }
 
-// SMS Alert Node
 function AlertNode({ data }) {
   return (
-    <div style={{ ...nodeStyle, background: "#be123c" }}>
-      <Handle
-        type="target"
-        position={Position.Left}
-        style={handleStyle}
-      />
-      <div>🚨 SMS Alert</div>
-      <small>{data.label}</small>
+    <div style={{ ...nodeStyle, borderColor: "#fb7185" }}>
+      <Handle type="target" position={Position.Top} />
+      <div style={titleStyle}>🚨 {data.label || "SMS Alert"}</div>
+      <div style={descriptionStyle}>
+        {data.description || "Alert action node"}
+      </div>
     </div>
   );
 }
 
-// Webhook Node
 function WebhookNode({ data }) {
   return (
-    <div style={{ ...nodeStyle, background: "#9333ea" }}>
-      <Handle
-        type="target"
-        position={Position.Left}
-        style={handleStyle}
-      />
-      <Handle
-        type="source"
-        position={Position.Right}
-        style={handleStyle}
-      />
-      <div>🔗 Webhook</div>
-      <small>{data.label}</small>
+    <div style={{ ...nodeStyle, borderColor: "#34d399" }}>
+      <Handle type="target" position={Position.Top} />
+      <div style={titleStyle}>🔗 {data.label || "Webhook"}</div>
+      <div style={descriptionStyle}>
+        {data.description || "Sends data to an external endpoint"}
+      </div>
     </div>
   );
 }
 
-// Register node types
+// ------------------------------------
+// Node type registration
+// ------------------------------------
+
 const nodeTypes = {
   sensor: SensorNode,
   average: AverageNode,
@@ -155,156 +133,118 @@ const nodeTypes = {
   webhook: WebhookNode,
 };
 
-// Initial pipeline nodes
+// ------------------------------------
+// Initial graph
+// ------------------------------------
+
 const initialNodes = [
   {
-    id: "1",
+    id: "sensor-1",
     type: "sensor",
-    position: { x: 50, y: 150 },
+    position: { x: 250, y: 40 },
     data: {
-      label: "Turbine Sensor",
-      value: "Temperature: 85°C",
+      label: "Temperature Sensor",
+      description: "Receives temperature data",
     },
   },
   {
-    id: "2",
+    id: "moving-average-1",
     type: "movingAverage",
-    position: { x: 310, y: 150 },
+    position: { x: 250, y: 180 },
     data: {
-      label: "Window: 5 samples",
+      label: "Moving Average",
+      description: "Smooths sensor readings",
     },
   },
   {
-    id: "3",
+    id: "threshold-1",
     type: "threshold",
-    position: { x: 570, y: 150 },
+    position: { x: 250, y: 320 },
     data: {
-      label: "Temperature",
-      condition: "Greater than 80°C",
+      label: "Threshold",
+      description: "Checks temperature limit",
     },
   },
   {
-    id: "4",
+    id: "alert-1",
     type: "alert",
-    position: { x: 830, y: 150 },
+    position: { x: 250, y: 460 },
     data: {
-      label: "Manager Notification",
+      label: "SMS Alert",
+      description: "Alert when limit is exceeded",
     },
   },
 ];
 
-// Initial pipeline connections
 const initialEdges = [
   {
-    id: "e1-2",
-    source: "1",
-    target: "2",
+    id: "edge-1",
+    source: "sensor-1",
+    target: "moving-average-1",
     animated: true,
   },
   {
-    id: "e2-3",
-    source: "2",
-    target: "3",
+    id: "edge-2",
+    source: "moving-average-1",
+    target: "threshold-1",
     animated: true,
   },
   {
-    id: "e3-4",
-    source: "3",
-    target: "4",
+    id: "edge-3",
+    source: "threshold-1",
+    target: "alert-1",
     animated: true,
   },
 ];
 
+// ------------------------------------
 // Node library
-const library = [
+// ------------------------------------
+
+const libraryItems = [
   {
     type: "sensor",
-    name: "Data Source",
-    description: "Receive IoT sensor data",
+    label: "Data Source",
+    description: "Sensor input",
     icon: "🌡️",
-    color: "#1d4ed8",
   },
   {
     type: "average",
-    name: "Average",
-    description: "Calculate average values",
-    icon: "📈",
-    color: "#0f766e",
+    label: "Average",
+    description: "Average calculation",
+    icon: "📊",
   },
   {
     type: "movingAverage",
-    name: "Moving Average",
-    description: "Calculate rolling average",
-    icon: "📊",
-    color: "#7c3aed",
+    label: "Moving Average",
+    description: "Smooth data stream",
+    icon: "📈",
   },
   {
     type: "threshold",
-    name: "Threshold",
-    description: "Compare sensor values",
-    icon: "⚙️",
-    color: "#b45309",
+    label: "Threshold",
+    description: "Compare against a limit",
+    icon: "⚖️",
   },
   {
     type: "alert",
-    name: "SMS Alert",
-    description: "Trigger notifications",
+    label: "SMS Alert",
+    description: "Alert action",
     icon: "🚨",
-    color: "#be123c",
   },
   {
     type: "webhook",
-    name: "Webhook",
-    description: "Send HTTP notifications",
+    label: "Webhook",
+    description: "External endpoint",
     icon: "🔗",
-    color: "#9333ea",
   },
 ];
 
-// Default data for each node
-function getNodeData(type) {
-  switch (type) {
-    case "sensor":
-      return {
-        label: "New Sensor",
-        value: "Temperature: 25°C",
-      };
+// ------------------------------------
+// Graph serialization
+// ------------------------------------
 
-    case "average":
-      return {
-        label: "Calculate Average",
-      };
-
-    case "movingAverage":
-      return {
-        label: "Window: 5 samples",
-      };
-
-    case "threshold":
-      return {
-        label: "New Condition",
-        condition: "Greater than 80°C",
-      };
-
-    case "alert":
-      return {
-        label: "New Notification",
-      };
-
-    case "webhook":
-      return {
-        label: "New Webhook Action",
-      };
-
-    default:
-      return {
-        label: "New Node",
-      };
-  }
-}
-
-// Convert React Flow graph into a clean JSON structure
-function serializeGraph(nodes, edges) {
+export function serializeGraph(nodes, edges) {
   return {
     nodes: nodes.map((node) => ({
       id: node.id,
@@ -313,21 +253,23 @@ function serializeGraph(nodes, edges) {
         x: node.position.x,
         y: node.position.y,
       },
-      data: { ...node.data },
+      data: node.data || {},
     })),
-
     edges: edges.map((edge) => ({
       id: edge.id,
       source: edge.source,
       target: edge.target,
-      sourceHandle: edge.sourceHandle ?? null,
-      targetHandle: edge.targetHandle ?? null,
-      animated: edge.animated ?? false,
+      sourceHandle: edge.sourceHandle || null,
+      targetHandle: edge.targetHandle || null,
+      animated: Boolean(edge.animated),
     })),
   };
 }
 
-// Main Flow Canvas
+// ------------------------------------
+// Main Flow Canvas Component
+// ------------------------------------
+
 export default function FlowCanvas() {
   const [nodes, setNodes, onNodesChange] =
     useNodesState(initialNodes);
@@ -337,22 +279,56 @@ export default function FlowCanvas() {
 
   const [showJSON, setShowJSON] = useState(false);
 
-  // Generate graph JSON
-  const graphJSON = JSON.stringify(
-    serializeGraph(nodes, edges),
-    null,
-    2
+  const onConnect = useCallback(
+    (connection) => {
+      setEdges((currentEdges) =>
+        addEdge(
+          {
+            ...connection,
+            animated: true,
+            style: { stroke: "#38bdf8" },
+          },
+          currentEdges
+        )
+      );
+    },
+    [setEdges]
   );
+
+  // Add a node from the library
+  const addNode = useCallback(
+    (item) => {
+      const newNode = {
+        id: `${item.type}-${Date.now()}`,
+        type: item.type,
+        position: {
+          x: 180 + Math.random() * 200,
+          y: 100 + nodes.length * 45,
+        },
+        data: {
+          label: item.label,
+          description: item.description,
+        },
+      };
+
+      setNodes((currentNodes) => [...currentNodes, newNode]);
+    },
+    [nodes.length, setNodes]
+  );
+
+  // Reset canvas
+  const resetCanvas = useCallback(() => {
+    setNodes(initialNodes);
+    setEdges(initialEdges);
+  }, [setNodes, setEdges]);
+
+  // Prepare graph JSON
+  const graphData = serializeGraph(nodes, edges);
+  const graphJSON = JSON.stringify(graphData, null, 2);
 
   // Download graph JSON
   const downloadJSON = useCallback(() => {
-    const json = JSON.stringify(
-      serializeGraph(nodes, edges),
-      null,
-      2
-    );
-
-    const blob = new Blob([json], {
+    const blob = new Blob([graphJSON], {
       type: "application/json",
     });
 
@@ -367,122 +343,139 @@ export default function FlowCanvas() {
     document.body.removeChild(link);
 
     URL.revokeObjectURL(url);
-  }, [nodes, edges]);
-
-  // Handle node connections
-  const onConnect = useCallback(
-    (connection) => {
-      setEdges((currentEdges) =>
-        addEdge(
-          {
-            ...connection,
-            animated: true,
-          },
-          currentEdges
-        )
-      );
-    },
-    [setEdges]
-  );
-
-  // Add new node
-  const addNode = useCallback(
-    (item) => {
-      const id = `node-${Date.now()}-${Math.floor(
-        Math.random() * 10000
-      )}`;
-
-      const newNode = {
-        id,
-        type: item.type,
-        position: {
-          x: 80 + (nodes.length % 3) * 260,
-          y: 350 + Math.floor(nodes.length / 3) * 170,
-        },
-        data: getNodeData(item.type),
-      };
-
-      setNodes((currentNodes) => [
-        ...currentNodes,
-        newNode,
-      ]);
-    },
-    [nodes.length, setNodes]
-  );
-
-  // Reset pipeline
-  const resetCanvas = useCallback(() => {
-    setNodes(initialNodes);
-    setEdges(initialEdges);
-  }, [setNodes, setEdges]);
+  }, [graphJSON]);
 
   return (
-    <div className="flow-workspace">
-
-      {/* Node Library */}
-      <aside className="node-library">
-        <h3>NODE LIBRARY</h3>
-
-        <p>Add components to your pipeline</p>
-
-        {library.map((item) => (
-          <button
-            key={item.type}
-            className="library-node"
-            onClick={() => addNode(item)}
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        width: "100%",
+        height: "100%",
+        minHeight: "600px",
+        background: "#0f172a",
+        borderRadius: "12px",
+        overflow: "hidden",
+      }}
+    >
+      {/* Toolbar */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: "10px",
+          padding: "14px",
+          background: "#1e293b",
+          borderBottom: "1px solid #334155",
+        }}
+      >
+        <div>
+          <div
             style={{
-              borderLeft: `4px solid ${item.color}`,
+              color: "#f8fafc",
+              fontWeight: "700",
+              fontSize: "15px",
             }}
           >
-            <span className="library-icon">
-              {item.icon}
-            </span>
+            Visual Pipeline Builder
+          </div>
 
-            <span className="library-details">
-              <strong>{item.name}</strong>
-              <small>{item.description}</small>
-            </span>
-
-            <span className="add-icon">+</span>
-          </button>
-        ))}
-
-        <div className="library-tip">
-          <strong>Tip</strong>
-          <p>
-            Add nodes and connect their handles to
-            create your IoT data pipeline.
-          </p>
+          <div
+            style={{
+              color: "#94a3b8",
+              fontSize: "11px",
+              marginTop: "4px",
+            }}
+          >
+            Create and connect your IoT workflow nodes
+          </div>
         </div>
-      </aside>
 
-      {/* Pipeline Canvas */}
-      <div className="flow-canvas-area">
-
-        {/* Canvas Toolbar */}
-        <div className="canvas-toolbar">
-          <span>{nodes.length} Nodes</span>
-          <span>{edges.length} Connections</span>
-
-          <button onClick={resetCanvas}>
-            Reset Canvas
+        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+          <button
+            onClick={() => setShowJSON((current) => !current)}
+            style={buttonStyle}
+          >
+            {showJSON ? "Hide JSON" : "View JSON"}
           </button>
 
-          <button onClick={downloadJSON}>
+          <button onClick={downloadJSON} style={buttonStyle}>
             Download Graph JSON
           </button>
 
-          <button
-            onClick={() =>
-              setShowJSON((previous) => !previous)
-            }
-          >
-            {showJSON ? "Hide Graph JSON" : "View Graph JSON"}
+          <button onClick={resetCanvas} style={resetButtonStyle}>
+            Reset Canvas
           </button>
         </div>
+      </div>
 
-        {/* React Flow */}
-        <div className="flow-canvas">
+      {/* Main workspace */}
+      <div
+        style={{
+          display: "flex",
+          flex: 1,
+          minHeight: "450px",
+        }}
+      >
+        {/* Node Library */}
+        <aside
+          style={{
+            width: "190px",
+            minWidth: "170px",
+            padding: "14px",
+            background: "#1e293b",
+            borderRight: "1px solid #334155",
+            overflowY: "auto",
+          }}
+        >
+          <h3
+            style={{
+              color: "#f8fafc",
+              fontSize: "13px",
+              margin: "0 0 14px",
+            }}
+          >
+            Node Library
+          </h3>
+
+          {libraryItems.map((item) => (
+            <button
+              key={item.type}
+              onClick={() => addNode(item)}
+              style={{
+                display: "block",
+                width: "100%",
+                textAlign: "left",
+                padding: "10px",
+                marginBottom: "9px",
+                borderRadius: "8px",
+                border: "1px solid #475569",
+                background: "#0f172a",
+                color: "#f8fafc",
+                cursor: "pointer",
+              }}
+            >
+              <div style={{ fontSize: "12px", fontWeight: "600" }}>
+                {item.icon} {item.label}
+              </div>
+
+              <div
+                style={{
+                  color: "#94a3b8",
+                  fontSize: "10px",
+                  marginTop: "4px",
+                }}
+              >
+                {item.description}
+              </div>
+            </button>
+          ))}
+        </aside>
+
+        {/* React Flow Canvas */}
+        <div style={{ flex: 1, minWidth: 0, minHeight: "450px" }}>
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -491,38 +484,90 @@ export default function FlowCanvas() {
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             fitView
+            fitViewOptions={{ padding: 0.2 }}
             deleteKeyCode={["Backspace", "Delete"]}
           >
-            <Background
-              color="#64748b"
-              gap={20}
-            />
-
+            <Background color="#475569" gap={20} />
             <Controls />
-            <MiniMap />
+            <MiniMap
+              nodeColor={(node) => {
+                switch (node.type) {
+                  case "sensor":
+                    return "#38bdf8";
+                  case "average":
+                  case "movingAverage":
+                    return "#a78bfa";
+                  case "threshold":
+                    return "#facc15";
+                  case "alert":
+                    return "#fb7185";
+                  case "webhook":
+                    return "#34d399";
+                  default:
+                    return "#64748b";
+                }
+              }}
+              maskColor="rgba(15, 23, 42, 0.7)"
+            />
           </ReactFlow>
         </div>
+      </div>
 
-        {/* Graph JSON Preview */}
-        {showJSON && (
+      {/* JSON Preview */}
+      {showJSON && (
+        <div
+          style={{
+            padding: "14px",
+            background: "#020617",
+            borderTop: "1px solid #334155",
+            maxHeight: "260px",
+            overflow: "auto",
+          }}
+        >
+          <div
+            style={{
+              color: "#38bdf8",
+              fontWeight: "700",
+              fontSize: "12px",
+              marginBottom: "10px",
+            }}
+          >
+            Pipeline JSON
+          </div>
+
           <pre
             style={{
-              marginTop: "12px",
-              padding: "15px",
-              background: "#111827",
-              color: "#e5e7eb",
-              borderRadius: "8px",
-              maxHeight: "300px",
-              overflow: "auto",
-              fontSize: "12px",
+              color: "#cbd5e1",
+              fontSize: "11px",
               whiteSpace: "pre-wrap",
               overflowWrap: "anywhere",
+              margin: 0,
             }}
           >
             {graphJSON}
           </pre>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
+
+// ------------------------------------
+// Button styles
+// ------------------------------------
+
+const buttonStyle = {
+  padding: "8px 12px",
+  borderRadius: "6px",
+  border: "1px solid #475569",
+  background: "#334155",
+  color: "#f8fafc",
+  fontSize: "11px",
+  cursor: "pointer",
+};
+
+const resetButtonStyle = {
+  ...buttonStyle,
+  background: "#7f1d1d",
+  borderColor: "#991b1b",
+};
