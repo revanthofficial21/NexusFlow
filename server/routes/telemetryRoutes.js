@@ -8,7 +8,8 @@ const {
   bulkReceiveTelemetry,
   getTelemetryHistory,
   getDeviceStatus,
-  getTelemetryAlerts
+  getTelemetryAlerts,
+  exportTelemetryCSV
 } = require("../controllers/telemetryController");
 
 router.post("/ingest", receiveTelemetry);
@@ -19,7 +20,9 @@ router.get("/history", getTelemetryHistory);
 
 router.get("/device-status", getDeviceStatus);
 router.get("/alerts", getTelemetryAlerts);
+router.get("/export", exportTelemetryCSV);
 module.exports = router;
+
 
 
 

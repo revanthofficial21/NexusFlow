@@ -367,3 +367,62 @@ async function getTelemetryAlerts(req, res) {
 }
 
 module.exports.getTelemetryAlerts = getTelemetryAlerts;
+
+async function exportTelemetryCSV(req, res) {
+  try {
+    const { deviceId, startDate, endDate } = req.query;
+    const filter = {};
+
+    if (deviceId) filter["metadata.deviceId"] = deviceId;
+
+    if (startDate || endDate) {
+      filter.timestamp = {};
+
+      if (startDate) {
+        const start = new Date(startDate);
+        if (isNaN(start.getTime())) {
+          return res.status(400).json({ success: false, message: "Invalid startDate" });
+        }
+        filter.timestamp.$gte = start;
+      }
+
+      if (endDate) {
+        const end = new Date(endDate);
+        if (isNaN(end.getTime())) {
+          return res.status(400).json({ success: false, message: "Invalid endDate" });
+        }
+        filter.timestamp.$lte = end;
+      }
+    }
+
+    const records = await mongoose.connection.db
+      .collection("telemetry")
+      .find(filter)
+      .sort({ timestamp: -1 })
+      .limit(10000)
+      .toArray();
+
+    const headers = ["timestamp", "deviceId", "deviceType", "location", "temperature", "humidity", "pressure"];
+    const escapeCSV = value => '"' + String(value ?? "").replace(/"/g, '""') + '"';
+
+    const rows = records.map(record => [
+      record.timestamp?.toISOString(),
+      record.metadata?.deviceId,
+      record.metadata?.deviceType,
+      record.metadata?.location,
+      record.readings?.temperature,
+      record.readings?.humidity,
+      record.readings?.pressure
+    ].map(escapeCSV).join(","));
+
+    const csv = [headers.join(","), ...rows].join("\r\n");
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", "attachment; filename=telemetry-export.csv");
+    res.status(200).send(csv);
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Failed to export telemetry data" });
+  }
+}
+
+module.exports.exportTelemetryCSV = exportTelemetryCSV;
