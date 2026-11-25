@@ -910,13 +910,3 @@ body {
 .link-button:hover {
   color: #7dd3fc;
 }
-
-/* One workspace page: sections stack, and the sidebar jumps between them */
-.workspace-section {
-  margin-bottom: 26px;
-  scroll-margin-top: 16px;
-}
-
-.workspace-section .dashboard-page {
-  gap: 0;
-}

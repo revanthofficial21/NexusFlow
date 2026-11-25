@@ -5,6 +5,7 @@ import FlowCanvas from "./components/graph/FlowCanvas";
 import { executeGraph } from "./services/compilerService";
 import { serializeGraph } from "./services/graphService";
 import { useAlerts } from "./hooks/useAlerts";
+import TelemetryDashboard from "./components/telemetry/TelemetryDashboard";
 import OverviewDashboard from "./components/dashboard/OverviewDashboard";
 import DevicesView from "./components/DevicesView";
 import AlertsView from "./components/AlertsView";
@@ -24,36 +25,35 @@ import {
 
 import "./App.css";
 
+const PAGE_TITLES = {
+  builder: {
+    tab: "Rule builder",
+    title: "Visual Rule Builder",
+    subtitle: "Build and manage your IoT data pipelines visually.",
+  },
+  dashboard: {
+    tab: "Dashboard",
+    title: "Telemetry Dashboard",
+    subtitle: "Live readings from the selected device.",
+  },
+  devices: {
+    tab: "Devices",
+    title: "Devices",
+    subtitle: "What is reporting, and when it was last heard from.",
+  },
+  alerts: {
+    tab: "Alerts",
+    title: "Alerts",
+    subtitle: "Every rule match, with acknowledge.",
+  },
+  overview: {
+    tab: "Overview",
+    title: "Workspace Overview",
+    subtitle: "Rules, devices, data and alerts at a glance.",
+  },
+};
+
 function App() {
-  /** The workspace is one page, so the sidebar moves to a section. */
-  const jumpTo = (id) => {
-    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
-
-  // Highlights the section in view, so the sidebar still reads as navigation.
-  const [activeSection, setActiveSection] = useState("overview");
-
-  useEffect(() => {
-    const ids = ["overview", "telemetry", "devices", "pipeline", "alerts"];
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-
-        if (visible) setActiveSection(visible.target.id);
-      },
-      { rootMargin: "-35% 0px -55% 0px", threshold: [0, 0.25, 0.5, 1] }
-    );
-
-    ids.forEach((id) => {
-      const element = document.getElementById(id);
-      if (element) observer.observe(element);
-    });
-
-    return () => observer.disconnect();
-  }, []);
-
   // Graph state
   const [graph, setGraph] = useState({
     nodes: [],
@@ -85,6 +85,10 @@ function App() {
   const [executionResult, setExecutionResult] = useState(null);
   const [executionError, setExecutionError] = useState("");
   const [backendConnected, setBackendConnected] = useState(false);
+
+  // Two views: the rule builder, and the telemetry dashboard that arrived from
+  // Vivek's branch.
+  const [view, setView] = useState("builder");
 
   // Live rule matches, pushed over Socket.IO. "" = every alert, "false" = only
   // the ones nobody has acknowledged yet.
@@ -463,18 +467,18 @@ function App() {
           <h3>WORKSPACE</h3>
 
           {[
-            { id: "overview", label: "▤ Overview" },
-            { id: "telemetry", label: "⚡ Live telemetry" },
+            { id: "builder", label: "⌘ Rule Builder" },
+            { id: "dashboard", label: "▦ Dashboard" },
             { id: "devices", label: "◉ Devices" },
-            { id: "pipeline", label: "⌘ Rule canvas" },
             { id: "alerts", label: "♧ Alerts" },
+            { id: "overview", label: "▤ Overview" },
           ].map((item) => (
             <button
               key={item.id}
               type="button"
-              className={`nav-item${activeSection === item.id ? " active" : ""}`}
-              onClick={() => jumpTo(item.id)}
-              aria-current={activeSection === item.id ? "true" : undefined}
+              className={`nav-item${view === item.id ? " active" : ""}`}
+              onClick={() => setView(item.id)}
+              aria-current={view === item.id ? "page" : undefined}
             >
               {item.label}
             </button>
@@ -541,20 +545,35 @@ function App() {
           {/* Page Heading */}
           <div className="page-heading">
             <div>
-              <h1>Workspace</h1>
-              <p>
-                Everything in one place: the overview, live telemetry, devices,
-                the rule canvas and the alert history.
-              </p>
+              <h1>{PAGE_TITLES[view]?.title || "NexusFlow"}</h1>
+              <p>{PAGE_TITLES[view]?.subtitle || ""}</p>
+            </div>
+
+            <div className="view-switch">
+              {Object.entries(PAGE_TITLES).map(([id, page]) => (
+                <button
+                  key={id}
+                  className={view === id ? "active" : ""}
+                  onClick={() => setView(id)}
+                >
+                  {page.tab}
+                </button>
+              ))}
             </div>
           </div>
 
-          <section id="overview" className="workspace-section">
-            <OverviewDashboard nodeTypes={NODE_LIBRARY} />
-          </section>
+          {view === "dashboard" && <TelemetryDashboard deviceId={chartDevice} />}
+
+          {view === "devices" && <DevicesView onSelect={setChartDevice} />}
+
+          {view === "alerts" && <AlertsView />}
+
+          {view === "overview" && <OverviewDashboard nodeTypes={NODE_LIBRARY} />}
+
+          <div style={{ display: view === "builder" ? "block" : "none" }}>
 
           {/* Live telemetry */}
-          <section id="telemetry" className="live-panel workspace-section">
+          <section className="live-panel">
             <div className="live-panel__head">
               <h3>LIVE TELEMETRY</h3>
 
@@ -593,7 +612,6 @@ function App() {
           </section>
 
           {/* Pipeline Management */}
-          <span id="pipeline" />
           <section className="pipeline-manager">
             <h3>PIPELINE MANAGEMENT</h3>
 
@@ -888,13 +906,7 @@ function App() {
             )}
           </section>
 
-          <section id="devices" className="workspace-section">
-            <DevicesView onSelect={setChartDevice} />
-          </section>
-
-          <section id="alerts" className="workspace-section">
-            <AlertsView />
-          </section>
+          </div>
         </main>
       </div>
     </div>
