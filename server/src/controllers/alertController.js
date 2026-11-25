@@ -9,6 +9,15 @@ const alerts = new AlertService();
 async function listAlerts(req, res) {
   const { limit, ruleId, acknowledged } = req.query;
 
+  // ?ruleId=a&ruleId=b arrives as an array; String([...]) would be "a,b" and
+  // silently match nothing.
+  if (ruleId !== undefined && typeof ruleId !== "string") {
+    return res.status(400).json({
+      success: false,
+      message: "ruleId must be a single value",
+    });
+  }
+
   // A typo like ?acknowledged=yes would otherwise filter on nothing and quietly
   // return every alert.
   if (acknowledged !== undefined && !["true", "false"].includes(acknowledged)) {

@@ -394,6 +394,14 @@ const server = app.listen(0, async () => {
     assert.match(body.message, /startDate is not a valid date/);
     console.log("Test 26 passed: export rejects an invalid date with 400");
 
+    // 22. An array query param would silently match nothing, so it is rejected.
+    res = await fetch(`${base}/api/alerts?ruleId=a&ruleId=b`);
+    body = await res.json();
+
+    assert.strictEqual(res.status, 400);
+    assert.match(body.message, /ruleId must be a single value/);
+    console.log("Test 27 passed: a repeated ruleId filter is rejected with 400");
+
     console.log("\nAll HTTP tests passed!");
   } catch (error) {
     console.error("HTTP test failed:", error.message);

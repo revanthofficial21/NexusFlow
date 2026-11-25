@@ -443,8 +443,10 @@ Represents a notification action that will be triggered when the configured cond
 **Webhook**
 
 POSTs (or PUTs/PATCHes) the matched value as JSON to a URL you configure. Delivery
-is fire-and-forget with a 3 second timeout: a failing endpoint is logged and never
-stops the pipeline.
+never blocks the pipeline and has a 3 second timeout. A successful delivery is
+silent; a failed one is recorded as a critical alert on the `webhook` channel, with
+the reason, so a dead endpoint shows up in the alert history instead of only in the
+server log.
 
 **SMS**
 

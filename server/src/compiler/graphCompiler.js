@@ -60,9 +60,19 @@ async function deliverWebhook(url, method, payload) {
 
     if (!response.ok) {
       console.warn(`[webhook] ${url} responded ${response.status}`);
+
+      return {
+        delivered: false,
+        status: response.status,
+        error: `endpoint responded ${response.status}`,
+      };
     }
+
+    return { delivered: true, status: response.status };
   } catch (error) {
     console.warn(`[webhook] ${url} failed: ${error.message}`);
+
+    return { delivered: false, error: error.message };
   } finally {
     clearTimeout(timer);
   }
@@ -392,11 +402,26 @@ function compileGraph(graph, sensorData$, options = {}) {
           tap((value) => {
             if (!live || !shouldFire(value)) return;
 
-            void deliverWebhook(url, method, {
+            deliverWebhook(url, method, {
               node: node.id,
               value,
               at: new Date().toISOString(),
-            });
+            })
+              .then((result) => {
+                // A successful POST is not news; a failed one is, and it used to
+                // leave no trace outside the server log.
+                if (result.delivered) return;
+
+                onAlert?.({
+                  nodeId: node.id,
+                  value,
+                  message: `Webhook ${url} failed: ${result.error}`,
+                  channel: "webhook",
+                  level: "critical",
+                  delivery: result,
+                });
+              })
+              .catch(() => {});
           })
         );
         break;
