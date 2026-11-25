@@ -23,6 +23,7 @@ const telemetrySchema = new mongoose.Schema(
     readings: {
       temperature: { type: Number, default: null },
       humidity: { type: Number, default: null },
+      pressure: { type: Number, default: null },
     },
   },
   {

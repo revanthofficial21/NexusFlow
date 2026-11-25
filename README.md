@@ -404,6 +404,23 @@ telemetry chart for the selected device (Socket.IO `telemetry`), a device rollup
 from `/api/telemetry/stats` where clicking a card switches the chart, and the alert
 feed with an All / Unacknowledged filter and per-alert acknowledge.
 
+### See it running
+
+With MongoDB configured and the server started:
+
+```bash
+cd server
+npm run seed     # creates the Turbine Temperature Monitoring rule
+npm run gen      # posts readings at 5/sec, with an occasional spike
+```
+
+The generator is a mock sensor: a slow sine wave around 72°C with noise and a 2%
+chance of a spike, so a threshold rule fires every so often instead of never. Knobs:
+`RATE`, `DEVICE`, `DURATION` (0 = until Ctrl+C), `SPIKE`, `LOCATION`, `BASE_URL`.
+
+Readings carry temperature, humidity and pressure; all three are charted, rolled up
+per device by `/api/telemetry/stats` and included in the CSV export.
+
 ### End-to-end check
 
 With MongoDB configured and the server running in another terminal:

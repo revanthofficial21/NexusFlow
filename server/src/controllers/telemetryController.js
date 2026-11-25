@@ -19,7 +19,7 @@ function validatePoint(input) {
     return { errors: ["point must be an object"], point: null };
   }
 
-  const { deviceId, deviceType, location, temperature, humidity } = input;
+  const { deviceId, deviceType, location, temperature, humidity, pressure } = input;
 
   if (!deviceId || typeof deviceId !== "string") {
     errors.push("deviceId is required and must be a string");
@@ -35,7 +35,7 @@ function validatePoint(input) {
 
   const readings = {};
 
-  for (const [field, value] of Object.entries({ temperature, humidity })) {
+  for (const [field, value] of Object.entries({ temperature, humidity, pressure })) {
     if (value === undefined || value === null || value === "") continue;
 
     const numeric = Number(value);
@@ -49,7 +49,7 @@ function validatePoint(input) {
   }
 
   if (errors.length === 0 && Object.keys(readings).length === 0) {
-    errors.push("at least one of temperature or humidity is required");
+    errors.push("at least one of temperature, humidity or pressure is required");
   }
 
   if (errors.length > 0) {
@@ -68,6 +68,7 @@ function validatePoint(input) {
       readings: {
         temperature: readings.temperature ?? null,
         humidity: readings.humidity ?? null,
+        pressure: readings.pressure ?? null,
       },
     },
   };
@@ -278,6 +279,8 @@ async function getTelemetryStats(req, res) {
           maxTemperature: { $max: "$readings.temperature" },
           avgHumidity: { $avg: "$readings.humidity" },
           maxHumidity: { $max: "$readings.humidity" },
+          avgPressure: { $avg: "$readings.pressure" },
+          maxPressure: { $max: "$readings.pressure" },
           latestTimestamp: { $max: "$timestamp" },
         },
       },
@@ -464,6 +467,7 @@ async function exportTelemetryCSV(req, res) {
       "location",
       "temperature",
       "humidity",
+      "pressure",
     ].join(",");
 
     const rows = records.map((record) =>
@@ -474,6 +478,7 @@ async function exportTelemetryCSV(req, res) {
         record.metadata?.location,
         record.readings?.temperature,
         record.readings?.humidity,
+        record.readings?.pressure,
       ]
         .map(csvCell)
         .join(",")

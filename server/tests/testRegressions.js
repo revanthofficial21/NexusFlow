@@ -233,6 +233,26 @@ expectThrow(
   "two sensors are rejected rather than duplicating readings"
 );
 
+// 10d. Pressure is a first-class reading now --------------------------------
+const withPressure = validatePoint({
+  deviceId: "turbine-01",
+  deviceType: "temperature",
+  pressure: 101.3,
+});
+
+assert.deepStrictEqual(withPressure.errors, []);
+assert.strictEqual(withPressure.point.readings.pressure, 101.3);
+console.log("Test 10d passed: a pressure reading is accepted and stored");
+
+const badPressure = validatePoint({
+  deviceId: "turbine-01",
+  deviceType: "temperature",
+  pressure: "high",
+});
+
+assert.ok(badPressure.errors.some((message) => message.includes("pressure")));
+console.log("Test 10e passed: a non-numeric pressure is rejected");
+
 // 11. The compiler needs a real stream --------------------------------------
 expectThrow(
   () => compileGraph(cleared),
