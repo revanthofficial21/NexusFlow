@@ -32,14 +32,17 @@ async function call(method, path, body) {
     body: body ? JSON.stringify(body) : undefined,
   });
 
+  const text = await res.text();
+
   let payload = null;
   try {
-    payload = await res.json();
+    payload = JSON.parse(text);
   } catch {
     payload = null;
   }
 
-  return { status: res.status, body: payload };
+  // CSV responses have no JSON body; keep the raw text so they can be checked.
+  return { status: res.status, body: payload, raw: text };
 }
 
 const deviceId = `smoke-${Date.now()}`;
@@ -173,6 +176,25 @@ async function main() {
       "update persisted the new name",
       updated.body?.pipeline?.name === `${pipelineName} (renamed)`,
       `got "${updated.body?.pipeline?.name}"`
+    );
+
+    // The read-only views: pagination, device liveness, CSV.
+    const history = await call("GET", `/api/telemetry/history?deviceId=${deviceId}&limit=2`);
+    check(
+      "history paginates",
+      history.status === 200 && history.body?.pagination?.totalRecords === 4,
+      `got ${history.status}, total ${history.body?.pagination?.totalRecords}`
+    );
+
+    const status = await call("GET", "/api/telemetry/device-status");
+    const statusEntry = (status.body?.devices || []).find((device) => device._id === deviceId);
+    check("device-status marks the device online", statusEntry?.status === "online");
+
+    const exported = await call("GET", `/api/telemetry/export?deviceId=${deviceId}`);
+    check(
+      "export returns CSV",
+      exported.status === 200 && String(exported.raw || "").includes("timestamp,deviceId"),
+      `got ${exported.status}`
     );
 
     // Pause and resume - the lifecycle a manager actually uses.

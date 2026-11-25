@@ -302,6 +302,9 @@ cd client && npm run dev
 | POST | `/api/telemetry/ingest` | Ingest a single reading |
 | POST | `/api/telemetry/batch` | Ingest up to 2000 readings |
 | GET | `/api/telemetry/latest` | Latest readings; filters: `deviceId`, `startDate`, `endDate`, `limit` |
+| GET | `/api/telemetry/history` | Paginated readings: `page`, `limit`, `deviceId` |
+| GET | `/api/telemetry/device-status` | Online/offline per device: `minutes` window |
+| GET | `/api/telemetry/export` | CSV download: `deviceId`, `startDate`, `endDate` |
 | GET | `/api/telemetry/stats` | Per-device rollup: readings, avg/max temperature and humidity, last seen |
 | POST | `/api/compiler/parse` | Validate a graph and report the execution plan, without running it |
 

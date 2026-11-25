@@ -379,6 +379,21 @@ const server = app.listen(0, async () => {
     assert.match(body.message, /enabled must be true or false/);
     console.log("Test 24 passed: a non-boolean enabled value is rejected with 400");
 
+    // 20. The read-only views are wired and fail closed without a database.
+    for (const path of ["/api/telemetry/history", "/api/telemetry/device-status", "/api/telemetry/export"]) {
+      res = await fetch(`${base}${path}`);
+      assert.strictEqual(res.status, 503, `${path} should be 503 without a database`);
+    }
+    console.log("Test 25 passed: history, device-status and export return 503 without a database");
+
+    // 21. Export validates its dates before touching the database.
+    res = await fetch(`${base}/api/telemetry/export?startDate=nope`);
+    body = await res.json();
+
+    assert.strictEqual(res.status, 400);
+    assert.match(body.message, /startDate is not a valid date/);
+    console.log("Test 26 passed: export rejects an invalid date with 400");
+
     console.log("\nAll HTTP tests passed!");
   } catch (error) {
     console.error("HTTP test failed:", error.message);

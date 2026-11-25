@@ -535,6 +535,14 @@ function App() {
                   aria-label="device id"
                 />
                 <span className="muted">{livePoints.length} points</span>
+
+                <a
+                  className="export-link"
+                  href={`${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api/telemetry/export?deviceId=${encodeURIComponent(chartDevice)}`}
+                  title="Download this device's readings as CSV"
+                >
+                  Export CSV
+                </a>
               </div>
             </div>
 

@@ -301,10 +301,215 @@ async function getTelemetryStats(req, res) {
   }
 }
 
+
+/**
+ * Paginated history for a data table.
+ *
+ * `latest` caps at 500 and has no total, which is fine for a chart but not for
+ * paging through readings.
+ */
+async function getTelemetryHistory(req, res) {
+  const page = Math.max(Math.trunc(Number(req.query.page)) || 1, 1);
+  const requestedLimit = Math.trunc(Number(req.query.limit));
+  const limit = Number.isFinite(requestedLimit)
+    ? Math.min(Math.max(requestedLimit, 1), 100)
+    : 20;
+
+  const deviceId = req.query.deviceId;
+
+  try {
+    const query = {};
+
+    if (deviceId) query["metadata.deviceId"] = deviceId;
+
+    const [records, totalRecords] = await Promise.all([
+      Telemetry.find(query)
+        .sort({ timestamp: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      Telemetry.countDocuments(query),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      pagination: {
+        page,
+        limit,
+        totalRecords,
+        totalPages: Math.max(Math.ceil(totalRecords / limit), 1),
+      },
+      records,
+    });
+  } catch (error) {
+    if (isDatabaseUnavailable(error)) {
+      return respondDatabaseUnavailable(res);
+    }
+
+    console.error("Telemetry history error:", error.message);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to read telemetry history",
+    });
+  }
+}
+
+/**
+ * Which devices are reporting, judged by when they were last heard from.
+ * `minutes` is how long a gap may be before a device counts as offline.
+ */
+async function getDeviceStatus(req, res) {
+  const requested = Number(req.query.minutes);
+  const minutes = Number.isFinite(requested)
+    ? Math.min(Math.max(Math.trunc(requested), 1), 1440)
+    : 5;
+
+  const cutoff = new Date(Date.now() - minutes * 60 * 1000);
+
+  try {
+    // $max rather than a leading $sort: same answer, one pass instead of two.
+    const devices = await Telemetry.aggregate([
+      {
+        $group: {
+          _id: "$metadata.deviceId",
+          deviceType: { $first: "$metadata.deviceType" },
+          location: { $first: "$metadata.location" },
+          lastSeen: { $max: "$timestamp" },
+          totalReadings: { $sum: 1 },
+        },
+      },
+      { $sort: { lastSeen: -1 } },
+    ]);
+
+    const data = devices.map((device) => ({
+      ...device,
+      status: device.lastSeen >= cutoff ? "online" : "offline",
+    }));
+
+    return res.status(200).json({
+      success: true,
+      windowMinutes: minutes,
+      onlineCount: data.filter((device) => device.status === "online").length,
+      offlineCount: data.filter((device) => device.status === "offline").length,
+      devices: data,
+    });
+  } catch (error) {
+    if (isDatabaseUnavailable(error)) {
+      return respondDatabaseUnavailable(res);
+    }
+
+    console.error("Device status error:", error.message);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to read device status",
+    });
+  }
+}
+
+/** Quotes a CSV field, doubling any quotes inside it. */
+function csvCell(value) {
+  return `"${String(value ?? "").replace(/"/g, '""')}"`;
+}
+
+/**
+ * CSV download of readings, for a spreadsheet or a report.
+ *
+ * A spreadsheet is where this data goes next, so the export is capped rather than
+ * unbounded: EXPORT_MAX_ROWS readings per request.
+ */
+async function exportTelemetryCSV(req, res) {
+  const deviceId = req.query.deviceId;
+  const start = parseDateParam(req.query.startDate, "startDate");
+  const end = parseDateParam(req.query.endDate, "endDate");
+
+  if (start.error || end.error) {
+    return res.status(400).json({
+      success: false,
+      message: start.error || end.error,
+    });
+  }
+
+  if (start.value && end.value && start.value > end.value) {
+    return res.status(400).json({
+      success: false,
+      message: "startDate must be before endDate",
+    });
+  }
+
+  const maxRows = Number(process.env.EXPORT_MAX_ROWS || 10000);
+
+  try {
+    const query = {};
+
+    if (deviceId) query["metadata.deviceId"] = deviceId;
+
+    if (start.value || end.value) {
+      query.timestamp = {
+        ...(start.value ? { $gte: start.value } : {}),
+        ...(end.value ? { $lte: end.value } : {}),
+      };
+    }
+
+    const records = await Telemetry.find(query)
+      .sort({ timestamp: -1 })
+      .limit(maxRows)
+      .lean();
+
+    const header = [
+      "timestamp",
+      "deviceId",
+      "deviceType",
+      "location",
+      "temperature",
+      "humidity",
+    ].join(",");
+
+    const rows = records.map((record) =>
+      [
+        record.timestamp?.toISOString(),
+        record.metadata?.deviceId,
+        record.metadata?.deviceType,
+        record.metadata?.location,
+        record.readings?.temperature,
+        record.readings?.humidity,
+      ]
+        .map(csvCell)
+        .join(",")
+    );
+
+    const csv = [header, ...rows].join("\r\n");
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="telemetry-export.csv"'
+    );
+    res.setHeader("X-Row-Count", String(records.length));
+
+    return res.status(200).send(csv);
+  } catch (error) {
+    if (isDatabaseUnavailable(error)) {
+      return respondDatabaseUnavailable(res);
+    }
+
+    console.error("Telemetry export error:", error.message);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to export telemetry",
+    });
+  }
+}
+
 module.exports = {
   receiveTelemetry,
   receiveTelemetryBatch,
   getLatestTelemetry,
   getTelemetryStats,
+  getTelemetryHistory,
+  getDeviceStatus,
+  exportTelemetryCSV,
   validatePoint,
 };

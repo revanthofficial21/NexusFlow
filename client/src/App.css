@@ -821,3 +821,18 @@ body {
   color: #38bdf8;
   background: rgba(56, 189, 248, 0.08);
 }
+
+/* CSV export link in the live telemetry panel */
+.export-link {
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  color: #94a3b8;
+  text-decoration: none;
+}
+
+.export-link:hover {
+  border-color: #38bdf8;
+  color: #38bdf8;
+}
