@@ -17,6 +17,7 @@ function OverviewDashboard({ nodeTypes = [] }) {
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [degraded, setDegraded] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -32,6 +33,15 @@ function OverviewDashboard({ nodeTypes = [] }) {
 
         if (cancelled) return;
 
+        // A 503 is not "zero pipelines": say so rather than showing zeros.
+        if (!pipelinesRes.ok || !statusRes.ok || !statsRes.ok || !alertsRes.ok) {
+          if (!cancelled) {
+            setDegraded(true);
+            setLoading(false);
+          }
+          return;
+        }
+
         const [pipelinesBody, statusBody, statsBody, alertsBody] = await Promise.all([
           pipelinesRes.ok ? pipelinesRes.json() : null,
           statusRes.ok ? statusRes.json() : null,
@@ -46,6 +56,7 @@ function OverviewDashboard({ nodeTypes = [] }) {
         setStats(statsBody?.devices || []);
         setAlerts(alertsBody?.alerts || []);
         setError("");
+        setDegraded(false);
       } catch (cause) {
         if (!cancelled) setError(cause.message);
       } finally {
@@ -95,6 +106,13 @@ function OverviewDashboard({ nodeTypes = [] }) {
   return (
     <div className="dashboard-page">
       {error && <p className="muted">Some figures are unavailable: {error}</p>}
+
+      {degraded && (
+        <p className="muted">
+          The API is not answering — start the server and check the database
+          connection. Figures below would be stale.
+        </p>
+      )}
 
       {loading ? (
         <p className="muted">Loading overview…</p>
