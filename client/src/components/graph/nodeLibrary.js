@@ -27,8 +27,10 @@ export const NODE_LIBRARY = [
   },
   {
     type: "alert",
-    name: "SMS Alert",
-    description: "Trigger notifications",
+    // Not "SMS Alert": the sms node below is the one that texts somebody, and two
+    // palette entries with the same name were impossible to tell apart.
+    name: "Alert",
+    description: "Record and broadcast a rule match",
     icon: "🚨",
     color: "#be123c",
   },

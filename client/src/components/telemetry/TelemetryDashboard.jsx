@@ -5,7 +5,7 @@ import "./TelemetryDashboard.css";
 const API_BASE =
   import.meta.env.VITE_API_URL || "http://localhost:5000";
 
-function TelemetryDashboard() {
+function TelemetryDashboard({ deviceId = "turbine-01" }) {
   const [record, setRecord] = useState(null);
   const [history, setHistory] = useState([]);
   const [lastUpdated, setLastUpdated] = useState(null);
@@ -18,7 +18,7 @@ function TelemetryDashboard() {
     const fetchTelemetry = async () => {
       try {
         const response = await fetch(
-          `${API_BASE}/api/telemetry/latest?deviceId=Turbine-Sensor-01&limit=8`
+          `${API_BASE}/api/telemetry/latest?deviceId=${encodeURIComponent(deviceId)}&limit=8`
         );
 
         if (!response.ok) {
@@ -68,7 +68,8 @@ function TelemetryDashboard() {
       active = false;
       clearInterval(interval);
     };
-  }, []);
+    // Re-fetch when the selected device changes, not just on mount.
+  }, [deviceId]);
 
   const temperature = record?.readings?.temperature;
   const humidity = record?.readings?.humidity;
@@ -167,8 +168,8 @@ function TelemetryDashboard() {
         <h2>Device Status</h2>
         <div className="telemetry-device-row">
           <div>
-            <strong>Turbine Sensor - 01</strong>
-            <p>Industrial temperature monitoring</p>
+            <strong>{deviceId}</strong>
+            <p>Selected device</p>
             <p>
               {record?.metadata?.location || "Waiting for sensor data"}
             </p>

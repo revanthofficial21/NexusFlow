@@ -6,6 +6,10 @@ import { executeGraph } from "./services/compilerService";
 import { serializeGraph } from "./services/graphService";
 import { useAlerts } from "./hooks/useAlerts";
 import TelemetryDashboard from "./components/telemetry/TelemetryDashboard";
+import OverviewDashboard from "./components/dashboard/OverviewDashboard";
+import DevicesView from "./components/DevicesView";
+import AlertsView from "./components/AlertsView";
+import { NODE_LIBRARY } from "./components/graph/nodeLibrary";
 import { useTelemetry } from "./hooks/useTelemetry";
 import { useEdgeActivity } from "./hooks/useEdgeActivity";
 import TelemetryChart from "./components/TelemetryChart";
@@ -20,6 +24,34 @@ import {
 } from "./services/pipelineService";
 
 import "./App.css";
+
+const PAGE_TITLES = {
+  builder: {
+    tab: "Rule builder",
+    title: "Visual Rule Builder",
+    subtitle: "Build and manage your IoT data pipelines visually.",
+  },
+  dashboard: {
+    tab: "Dashboard",
+    title: "Telemetry Dashboard",
+    subtitle: "Live readings from the selected device.",
+  },
+  devices: {
+    tab: "Devices",
+    title: "Devices",
+    subtitle: "What is reporting, and when it was last heard from.",
+  },
+  alerts: {
+    tab: "Alerts",
+    title: "Alerts",
+    subtitle: "Every rule match, with acknowledge.",
+  },
+  overview: {
+    tab: "Overview",
+    title: "Workspace Overview",
+    subtitle: "Rules, devices, data and alerts at a glance.",
+  },
+};
 
 function App() {
   // Graph state
@@ -434,14 +466,23 @@ function App() {
         <aside className="sidebar">
           <h3>WORKSPACE</h3>
 
-          <div className="nav-item active">
-            ⌘ Rule Builder
-          </div>
-
-          <div className="nav-item">▦ Dashboard</div>
-          <div className="nav-item">◉ Devices</div>
-          <div className="nav-item">⚡ Telemetry</div>
-          <div className="nav-item">♧ Alerts</div>
+          {[
+            { id: "builder", label: "⌘ Rule Builder" },
+            { id: "dashboard", label: "▦ Dashboard" },
+            { id: "devices", label: "◉ Devices" },
+            { id: "alerts", label: "♧ Alerts" },
+            { id: "overview", label: "▤ Overview" },
+          ].map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className={`nav-item${view === item.id ? " active" : ""}`}
+              onClick={() => setView(item.id)}
+              aria-current={view === item.id ? "page" : undefined}
+            >
+              {item.label}
+            </button>
+          ))}
 
           <div className="alert-panel">
             <h3>
@@ -504,31 +545,30 @@ function App() {
           {/* Page Heading */}
           <div className="page-heading">
             <div>
-              <h1>{view === "builder" ? "Visual Rule Builder" : "Telemetry Dashboard"}</h1>
-              <p>
-                {view === "builder"
-                  ? "Build and manage your IoT data pipelines visually."
-                  : "Live readings from the Turbine sensor."}
-              </p>
+              <h1>{PAGE_TITLES[view]?.title || "NexusFlow"}</h1>
+              <p>{PAGE_TITLES[view]?.subtitle || ""}</p>
             </div>
 
             <div className="view-switch">
-              <button
-                className={view === "builder" ? "active" : ""}
-                onClick={() => setView("builder")}
-              >
-                Rule builder
-              </button>
-              <button
-                className={view === "dashboard" ? "active" : ""}
-                onClick={() => setView("dashboard")}
-              >
-                Dashboard
-              </button>
+              {Object.entries(PAGE_TITLES).map(([id, page]) => (
+                <button
+                  key={id}
+                  className={view === id ? "active" : ""}
+                  onClick={() => setView(id)}
+                >
+                  {page.tab}
+                </button>
+              ))}
             </div>
           </div>
 
-          {view === "dashboard" && <TelemetryDashboard />}
+          {view === "dashboard" && <TelemetryDashboard deviceId={chartDevice} />}
+
+          {view === "devices" && <DevicesView onSelect={setChartDevice} />}
+
+          {view === "alerts" && <AlertsView />}
+
+          {view === "overview" && <OverviewDashboard nodeTypes={NODE_LIBRARY} />}
 
           <div style={{ display: view === "builder" ? "block" : "none" }}>
 
@@ -701,7 +741,9 @@ function App() {
               )}
 
               <p className="pipeline-count">
-                {savedPipelines.length} pipelines saved in MongoDB
+                {savedPipelines.length}{" "}
+                {savedPipelines.length === 1 ? "pipeline" : "pipelines"} saved in
+                MongoDB
               </p>
 
             </div>
