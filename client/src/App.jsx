@@ -42,6 +42,7 @@ function App() {
   const [savedPipelines, setSavedPipelines] = useState([]);
   const [selectedPipelineId, setSelectedPipelineId] = useState("");
   const [selectedPipeline, setSelectedPipeline] = useState(null);
+  const [sensorDataInput, setSensorDataInput] = useState("90, 100, 110, 120");
 
   const [pipelineLoading, setPipelineLoading] = useState(false);
   const [pipelineMessage, setPipelineMessage] = useState("");
@@ -365,12 +366,23 @@ function App() {
       return;
     }
 
+    // The readings the rule is tested against. They used to be hardcoded to a
+    // sample array, so a rule could only ever be tried on the same four numbers.
+    const sensorData = sensorDataInput
+      .split(/[,\s]+/)
+      .filter((part) => part !== "")
+      .map(Number);
+
+    if (sensorData.length === 0 || sensorData.some((value) => !Number.isFinite(value))) {
+      setExecutionError(
+        "Readings must be numbers separated by commas, for example 90, 100, 110"
+      );
+      return;
+    }
+
     setLoading(true);
     setExecutionResult(null);
     setExecutionError("");
-
-    // Temporary sample sensor readings
-    const sensorData = [90, 100, 110, 120];
 
     try {
       const serialized = serializeGraph(graph.nodes, graph.edges);
@@ -714,6 +726,17 @@ function App() {
               <h3>Pipeline Canvas</h3>
               <span>Drag nodes and connect them</span>
             </div>
+
+            <label className="readings-input">
+              <span>Test readings</span>
+              <input
+                type="text"
+                value={sensorDataInput}
+                onChange={(event) => setSensorDataInput(event.target.value)}
+                placeholder="90, 100, 110"
+                aria-label="test readings"
+              />
+            </label>
 
             <button
               className="primary-button"

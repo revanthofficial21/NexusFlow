@@ -15,6 +15,8 @@ import {
 
 import "@xyflow/react/dist/style.css";
 
+import { NODE_LIBRARY } from "./nodeLibrary";
+
 const nodeStyle = {
   borderRadius: "12px",
   padding: "15px",
@@ -164,51 +166,7 @@ const initialEdges = [
   { id: "e3-4", source: "3", target: "4", animated: true },
 ];
 
-// Node library
-const library = [
-  {
-    type: "sensor",
-    name: "Data Source",
-    description: "Receive IoT sensor data",
-    icon: "🌡️",
-    color: "#1d4ed8",
-  },
-  {
-    type: "average",
-    name: "Moving Average",
-    description: "Calculate rolling average",
-    icon: "📊",
-    color: "#7c3aed",
-  },
-  {
-    type: "threshold",
-    name: "Threshold",
-    description: "Compare sensor values",
-    icon: "⚙️",
-    color: "#b45309",
-  },
-  {
-    type: "alert",
-    name: "SMS Alert",
-    description: "Trigger notifications",
-    icon: "🚨",
-    color: "#be123c",
-  },
-  {
-    type: "webhook",
-    name: "Webhook",
-    description: "POST the value to a URL",
-    icon: "🔗",
-    color: "#9333ea",
-  },
-  {
-    type: "sms",
-    name: "SMS Alert",
-    description: "Text a phone number",
-    icon: "📱",
-    color: "#047857",
-  },
-];
+
 
 export default function FlowCanvas({
   onGraphChange,
@@ -410,7 +368,7 @@ export default function FlowCanvas({
         <h3>NODE LIBRARY</h3>
         <p>Add components to your pipeline</p>
 
-        {library.map((item) => (
+        {NODE_LIBRARY.map((item) => (
           <button
             key={item.type}
             className="library-node"

@@ -391,6 +391,12 @@ When a rule's alert node matches, the registry hands the alert to
 it. `POST /api/compiler/execute` passes no alert handler, so a dry run never
 writes an alert.
 
+### Views
+
+Three views share the same header: **Rule builder** (canvas, saved pipelines, live
+chart, devices, alerts), **Dashboard** (a single device's live readings) and
+**Overview** (rules, devices, readings and alerts at a glance, refreshed every 15s).
+
 ### Dashboard
 
 The client shows three live views, all fed by what the API already exposes: a

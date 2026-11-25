@@ -836,3 +836,22 @@ body {
   border-color: #38bdf8;
   color: #38bdf8;
 }
+
+/* Test readings input beside Execute */
+.readings-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.readings-input input {
+  width: 170px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: #0f172a;
+  color: #e2e8f0;
+  font-size: 12px;
+}

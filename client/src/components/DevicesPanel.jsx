@@ -23,6 +23,17 @@ const timeAgo = (timestamp) => {
 export default function DevicesPanel({ onSelect, refreshKey = 0 }) {
   const [devices, setDevices] = useState([]);
   const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  // "last seen 40s ago" needs a re-render to stay true, otherwise it freezes at
+  // whatever it said when the list loaded.
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => setTick((value) => value + 1), 15000);
+
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -30,16 +41,22 @@ export default function DevicesPanel({ onSelect, refreshKey = 0 }) {
     fetch(`${BASE_URL}/api/telemetry/stats`)
       .then((response) => (response.ok ? response.json() : null))
       .then((data) => {
-        if (!cancelled) setDevices(data?.devices || []);
+        if (cancelled) return;
+        setDevices(data?.devices || []);
+        setLoading(false);
       })
       .catch((cause) => {
-        if (!cancelled) setError(cause.message);
+        if (cancelled) return;
+        setError(cause.message);
+        setLoading(false);
       });
 
     return () => {
       cancelled = true;
     };
   }, [refreshKey]);
+
+  if (loading) return <p className="muted">Loading devices…</p>;
 
   if (error) return <p className="muted">Device stats unavailable: {error}</p>;
 

@@ -66,14 +66,18 @@ export function useAlerts({ deviceId, acknowledged } = {}) {
 
     socket.on("connect", () => setConnected(true));
     socket.on("disconnect", () => setConnected(false));
-    socket.on("alert", (alert) =>
-      setAlerts((previous) => [alert, ...previous].slice(0, MAX_ALERTS))
-    );
+    socket.on("alert", (alert) => {
+      // A new alert is unacknowledged, so it does not belong in an
+      // "acknowledged only" view.
+      if (acknowledged === "true") return;
+
+      setAlerts((previous) => [alert, ...previous].slice(0, MAX_ALERTS));
+    });
 
     if (deviceId) socket.emit("subscribe:device", { deviceId });
 
     return () => socket.disconnect();
-  }, [deviceId]);
+  }, [deviceId, acknowledged]);
 
   /** Marks one alert acknowledged on the server, then locally. */
   const acknowledge = useCallback(
