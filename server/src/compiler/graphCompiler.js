@@ -18,6 +18,12 @@ const MAX_WINDOW = 1000;
 const WEBHOOK_TIMEOUT_MS = 3000;
 const WEBHOOK_METHODS = ["POST", "PUT", "PATCH"];
 const SIDE_EFFECT_WINDOW_MS = 250;
+const WEBHOOK_ATTEMPTS = 3;
+// Backoff between attempts. Short enough that a rule still reports within a second,
+// long enough to ride out a dropped packet or a restarting endpoint.
+const WEBHOOK_BACKOFF_MS = [200, 500];
+// 4xx means the request itself is wrong; repeating it changes nothing.
+const RETRYABLE_STATUS = (status) => status >= 500 || status === 429;
 
 /**
  * Collapses a repeated value inside a short window.
@@ -46,36 +52,64 @@ function createSideEffectGuard(windowMs = SIDE_EFFECT_WINDOW_MS) {
  * Fire-and-forget delivery. A failing webhook must never break the pipeline, so
  * every failure is logged and swallowed.
  */
-async function deliverWebhook(url, method, payload) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), WEBHOOK_TIMEOUT_MS);
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-  try {
-    const response = await fetch(url, {
-      method,
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(payload),
-      signal: controller.signal,
-    });
+/**
+ * Delivers one webhook, retrying transient failures.
+ *
+ * A single attempt meant one dropped packet lost the alert forever. Network errors
+ * and 5xx/429 are retried with a short backoff; a 4xx is not, because repeating a
+ * malformed request just repeats the same rejection.
+ */
+async function deliverWebhook(url, method, payload, { attempts = WEBHOOK_ATTEMPTS } = {}) {
+  let lastError = null;
+  let lastStatus;
 
-    if (!response.ok) {
-      console.warn(`[webhook] ${url} responded ${response.status}`);
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), WEBHOOK_TIMEOUT_MS);
 
-      return {
-        delivered: false,
-        status: response.status,
-        error: `endpoint responded ${response.status}`,
-      };
+    try {
+      const response = await fetch(url, {
+        method,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+
+      lastStatus = response.status;
+
+      if (response.ok) {
+        return { delivered: true, status: response.status, attempts: attempt };
+      }
+
+      lastError = `endpoint responded ${response.status}`;
+
+      if (!RETRYABLE_STATUS(response.status)) {
+        console.warn(`[webhook] ${url} responded ${response.status}, not retrying`);
+        return { delivered: false, status: response.status, attempts: attempt, error: lastError };
+      }
+    } catch (error) {
+      lastError = error.message;
+    } finally {
+      clearTimeout(timer);
     }
 
-    return { delivered: true, status: response.status };
-  } catch (error) {
-    console.warn(`[webhook] ${url} failed: ${error.message}`);
-
-    return { delivered: false, error: error.message };
-  } finally {
-    clearTimeout(timer);
+    if (attempt < attempts) {
+      const wait = WEBHOOK_BACKOFF_MS[attempt - 1] ?? WEBHOOK_BACKOFF_MS.at(-1);
+      console.warn(`[webhook] ${url} attempt ${attempt} failed (${lastError}), retrying in ${wait}ms`);
+      await sleep(wait);
+    }
   }
+
+  console.warn(`[webhook] ${url} gave up after ${attempts} attempts`);
+
+  return {
+    delivered: false,
+    status: lastStatus,
+    attempts,
+    error: lastError || "delivery failed",
+  };
 }
 
 /**
@@ -415,7 +449,7 @@ function compileGraph(graph, sensorData$, options = {}) {
                 onAlert?.({
                   nodeId: node.id,
                   value,
-                  message: `Webhook ${url} failed: ${result.error}`,
+                  message: `Webhook ${url} failed after ${result.attempts} attempt(s): ${result.error}`,
                   channel: "webhook",
                   level: "critical",
                   delivery: result,

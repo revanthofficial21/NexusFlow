@@ -443,10 +443,14 @@ Represents a notification action that will be triggered when the configured cond
 **Webhook**
 
 POSTs (or PUTs/PATCHes) the matched value as JSON to a URL you configure. Delivery
-never blocks the pipeline and has a 3 second timeout. A successful delivery is
-silent; a failed one is recorded as a critical alert on the `webhook` channel, with
-the reason, so a dead endpoint shows up in the alert history instead of only in the
-server log.
+never blocks the pipeline and has a 3 second timeout per attempt.
+
+Transient failures are retried: network errors, 5xx and 429 get three attempts with
+a 200ms then 500ms backoff. A 4xx is not retried - repeating a malformed request
+just repeats the rejection. A successful delivery is silent; a failure after the
+final attempt is recorded as a critical alert on the `webhook` channel, with the
+status and attempt count, so a dead endpoint shows up in the alert history instead
+of only in the server log.
 
 **SMS**
 

@@ -61,14 +61,73 @@ async function main() {
     onAlert: (alert) => failed.push(alert),
   }).subscribe();
 
-  await wait(800);
+  await wait(2500);
 
   assert.strictEqual(failed.length, 1);
+  assert.strictEqual(failed[0].delivery.attempts, 3);
   assert.strictEqual(failed[0].channel, "webhook");
   assert.strictEqual(failed[0].level, "critical");
   assert.strictEqual(failed[0].delivery.delivered, false);
   assert.match(failed[0].message, /failed/i);
-  console.log("Test 2 passed: a failed webhook is recorded as a critical alert");
+  console.log("Test 2 passed: an unreachable endpoint is retried 3 times, then recorded as a critical alert");
+
+  // 2b. A transient failure is retried and succeeds.
+  const flaky = { hits: 0 };
+  const flakyServer = http.createServer((req, res) => {
+    req.resume();
+    req.on("end", () => {
+      flaky.hits += 1;
+      // fail twice, then accept
+      res.writeHead(flaky.hits < 3 ? 500 : 204).end();
+    });
+  });
+
+  await new Promise((resolve) => flakyServer.listen(0, resolve));
+  const flakyPort = flakyServer.address().port;
+
+  const retried = [];
+  compileGraph(graph(`http://127.0.0.1:${flakyPort}/hook`), of(92), {
+    live: true,
+    onAlert: (alert) => retried.push(alert),
+  }).subscribe();
+
+  await wait(2000);
+
+  assert.strictEqual(flaky.hits, 3, `expected 3 attempts, got ${flaky.hits}`);
+  assert.deepStrictEqual(retried, [], "a delivery that eventually succeeds is not an alert");
+  console.log("Test 3 passed: a 500 is retried and the delivery succeeds on the third attempt");
+
+  flakyServer.closeAllConnections();
+  await new Promise((resolve) => flakyServer.close(resolve));
+
+  // 2c. A 4xx is not retried: repeating a malformed request cannot help.
+  const rejecting = { hits: 0 };
+  const rejectingServer = http.createServer((req, res) => {
+    req.resume();
+    req.on("end", () => {
+      rejecting.hits += 1;
+      res.writeHead(400).end();
+    });
+  });
+
+  await new Promise((resolve) => rejectingServer.listen(0, resolve));
+  const rejectingPort = rejectingServer.address().port;
+
+  const rejected = [];
+  compileGraph(graph(`http://127.0.0.1:${rejectingPort}/hook`), of(92), {
+    live: true,
+    onAlert: (alert) => rejected.push(alert),
+  }).subscribe();
+
+  await wait(800);
+
+  assert.strictEqual(rejecting.hits, 1, `expected a single attempt, got ${rejecting.hits}`);
+  assert.strictEqual(rejected.length, 1);
+  assert.strictEqual(rejected[0].delivery.attempts, 1);
+  console.log("Test 4 passed: a 400 is reported at once, without retrying");
+
+  rejectingServer.closeAllConnections();
+  await new Promise((resolve) => rejectingServer.close(resolve));
 
   // 3. A dry run still posts nothing.
   const dry = [];
@@ -79,7 +138,7 @@ async function main() {
   await wait();
 
   assert.deepStrictEqual(dry, []);
-  console.log("Test 3 passed: a dry run posts nothing");
+  console.log("Test 5 passed: a dry run posts nothing");
 
   console.log("\nAll webhook tests passed!");
 }
