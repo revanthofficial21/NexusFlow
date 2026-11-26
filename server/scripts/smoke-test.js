@@ -26,9 +26,16 @@ function check(label, condition, detail) {
 }
 
 async function call(method, path, body) {
+  // If the server is running with INGEST_API_KEY set, writes need the header.
+  const key = process.env.INGEST_API_KEY;
+  const headers = {};
+
+  if (body) headers["content-type"] = "application/json";
+  if (key) headers["x-api-key"] = key;
+
   const res = await fetch(`${BASE}${path}`, {
     method,
-    headers: body ? { "content-type": "application/json" } : undefined,
+    headers: Object.keys(headers).length > 0 ? headers : undefined,
     body: body ? JSON.stringify(body) : undefined,
   });
 

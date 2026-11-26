@@ -47,6 +47,14 @@ const startServer = async () => {
     telemetryStream().subscribe((document) => realtime.broadcastTelemetry(document));
 
     const server = httpServer.listen(PORT, () => {
+      if (!process.env.INGEST_API_KEY) {
+        console.log(
+          "  ingest: open (set INGEST_API_KEY to require x-api-key on writes)"
+        );
+      } else {
+        console.log("  ingest: x-api-key required");
+      }
+
       console.log(`NexusFlow server running on port ${PORT}`);
       console.log(`Health check: http://localhost:${PORT}/api/health`);
       console.log(`Socket.IO listening on the same port`);

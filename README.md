@@ -404,6 +404,22 @@ telemetry chart for the selected device (Socket.IO `telemetry`), a device rollup
 from `/api/telemetry/stats` where clicking a card switches the chart, and the alert
 feed with an All / Unacknowledged filter and per-alert acknowledge.
 
+### Protecting the write path
+
+`POST /api/telemetry/ingest` and `/batch` accept data from hardware, so they can be
+locked with a shared key:
+
+```bash
+# server/.env
+INGEST_API_KEY=some-long-random-string
+```
+
+Every write then needs `x-api-key: some-long-random-string`, compared in constant
+time. Reads (`latest`, `history`, `stats`, `export`) stay open, so a dashboard can
+poll without the secret. `npm run gen` sends the header automatically when
+`INGEST_API_KEY` is in its environment. Left empty, writes are open and the server
+prints a warning at boot.
+
 ### See it running
 
 With MongoDB configured and the server started:

@@ -18,7 +18,17 @@ const graph = (url) => ({
   ],
 });
 
-const wait = (ms = 800) => new Promise((resolve) => setTimeout(resolve, ms));
+/** Waits for a condition rather than guessing a sleep, so the suite is not timing-flaky. */
+const until = async (predicate, timeoutMs = 5000) => {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    if (predicate()) return true;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+
+  return false;
+};
 
 async function main() {
   // A receiver that records what arrives.
@@ -42,7 +52,7 @@ async function main() {
     onAlert: (alert) => okAlerts.push(alert),
   }).subscribe();
 
-  await wait();
+  assert.ok(await until(() => received.length >= 1), "the webhook should have been called");
 
   assert.strictEqual(received.length, 1);
   assert.strictEqual(received[0].method, "POST");
@@ -61,7 +71,7 @@ async function main() {
     onAlert: (alert) => failed.push(alert),
   }).subscribe();
 
-  await wait(2500);
+  assert.ok(await until(() => failed.length >= 1), "a failed delivery should be reported");
 
   assert.strictEqual(failed.length, 1);
   assert.strictEqual(failed[0].delivery.attempts, 3);
@@ -91,7 +101,7 @@ async function main() {
     onAlert: (alert) => retried.push(alert),
   }).subscribe();
 
-  await wait(2000);
+  assert.ok(await until(() => flaky.hits >= 3), `expected 3 attempts, got ${flaky.hits}`);
 
   assert.strictEqual(flaky.hits, 3, `expected 3 attempts, got ${flaky.hits}`);
   assert.deepStrictEqual(retried, [], "a delivery that eventually succeeds is not an alert");
@@ -119,7 +129,7 @@ async function main() {
     onAlert: (alert) => rejected.push(alert),
   }).subscribe();
 
-  await wait(800);
+  assert.ok(await until(() => rejecting.hits >= 1), "the 400 should have been reported");
 
   assert.strictEqual(rejecting.hits, 1, `expected a single attempt, got ${rejecting.hits}`);
   assert.strictEqual(rejected.length, 1);
@@ -135,7 +145,8 @@ async function main() {
     onAlert: (alert) => dry.push(alert),
   }).subscribe();
 
-  await wait();
+  // Nothing should happen at all, so this one genuinely waits.
+  await new Promise((resolve) => setTimeout(resolve, 500));
 
   assert.deepStrictEqual(dry, []);
   console.log("Test 5 passed: a dry run posts nothing");

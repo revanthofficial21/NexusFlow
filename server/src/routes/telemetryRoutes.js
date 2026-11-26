@@ -1,4 +1,5 @@
 const express = require("express");
+const { requireIngestKey } = require("../middleware/requireIngestKey");
 
 const {
   receiveTelemetry,
@@ -12,8 +13,9 @@ const {
 
 const router = express.Router();
 
-router.post("/ingest", receiveTelemetry);
-router.post("/batch", receiveTelemetryBatch);
+// Reads stay open; the two write routes are behind the key.
+router.post("/ingest", requireIngestKey, receiveTelemetry);
+router.post("/batch", requireIngestKey, receiveTelemetryBatch);
 router.get("/latest", getLatestTelemetry);
 router.get("/stats", getTelemetryStats);
 

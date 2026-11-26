@@ -402,6 +402,41 @@ const server = app.listen(0, async () => {
     assert.match(body.message, /ruleId must be a single value/);
     console.log("Test 27 passed: a repeated ruleId filter is rejected with 400");
 
+    // 23. The ingest key guards writes only.
+    const point = { deviceId: "turbine-01", deviceType: "temperature", temperature: 20 };
+    const write = (headers = {}) =>
+      fetch(`${base}/api/telemetry/ingest`, {
+        method: "POST",
+        headers: { "content-type": "application/json", ...headers },
+        body: JSON.stringify(point),
+      });
+
+    delete process.env.INGEST_API_KEY;
+    res = await write();
+    assert.notStrictEqual(res.status, 401, "with no key configured, writes are open");
+    console.log("Test 28 passed: with no INGEST_API_KEY configured, writes are open");
+
+    process.env.INGEST_API_KEY = "secret-123";
+
+    res = await write();
+    body = await res.json();
+    assert.strictEqual(res.status, 401);
+    assert.match(body.message, /x-api-key/);
+
+    res = await write({ "x-api-key": "wrong" });
+    assert.strictEqual(res.status, 401);
+    console.log("Test 29 passed: a missing or wrong key is 401");
+
+    res = await write({ "x-api-key": "secret-123" });
+    assert.notStrictEqual(res.status, 401, "the right key gets past the guard");
+    console.log("Test 30 passed: the right key gets past the guard");
+
+    res = await fetch(`${base}/api/telemetry/latest`);
+    assert.notStrictEqual(res.status, 401, "reads stay open");
+    console.log("Test 31 passed: reads stay open while writes are protected");
+
+    delete process.env.INGEST_API_KEY;
+
     console.log("\nAll HTTP tests passed!");
   } catch (error) {
     console.error("HTTP test failed:", error.message);

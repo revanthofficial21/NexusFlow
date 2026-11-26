@@ -15,6 +15,7 @@
  *   SPIKE     chance per reading, 0-1  (default 0.02)
  */
 const BASE_URL = process.env.BASE_URL || "http://localhost:5000";
+const API_KEY = process.env.INGEST_API_KEY;
 
 const RATE = Math.max(Number(process.env.RATE) || 5, 1);
 const DEVICE = process.env.DEVICE || "turbine-01";
@@ -52,7 +53,10 @@ async function flush() {
   try {
     const response = await fetch(`${BASE_URL}/api/telemetry/batch`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        ...(API_KEY ? { "x-api-key": API_KEY } : {}),
+      },
       body: JSON.stringify(points),
     });
 
