@@ -7,6 +7,7 @@ const compilerRoutes = require("./routes/compilerRoutes");
 const pipelineRoutes = require("./routes/pipelineRoutes");
 const telemetryRoutes = require("./routes/telemetryRoutes");
 const alertRoutes = require("./routes/alertRoutes");
+const deviceRoutes = require("./routes/deviceRoutes");
 
 // Applies to every model, including when the app is mounted without a database
 // (tests). Set here rather than only on connect(), because a model created before
@@ -42,6 +43,9 @@ app.use("/api/pipelines", pipelineRoutes);
 
 // Alert history
 app.use("/api/alerts", alertRoutes);
+
+// Device registry
+app.use("/api/devices", deviceRoutes);
 
 // Root route
 app.get("/", (req, res) => {

@@ -242,6 +242,27 @@ async function main() {
       `got ${exported.status}`
     );
 
+    // Device registry: name a device that is already reporting.
+    const named = await call("PUT", `/api/devices/${deviceId}`, {
+      name: "Smoke turbine",
+      location: "Smoke room",
+    });
+    check("PUT /api/devices/:id returns 200", named.status === 200, `got ${named.status}`);
+    check("the registry keeps the name", named.body?.device?.name === "Smoke turbine");
+
+    const devices = await call("GET", "/api/devices");
+    const entry = (devices.body?.devices || []).find((device) => device.deviceId === deviceId);
+    check("the device is in the registry", Boolean(entry));
+
+    const readBack = await call("GET", `/api/devices/${deviceId}`);
+    check("a single device can be read back", readBack.body?.device?.location === "Smoke room");
+
+    const registryRemoved = await call("DELETE", `/api/devices/${deviceId}`);
+    check("DELETE /api/devices/:id returns 200", registryRemoved.status === 200, `got ${registryRemoved.status}`);
+
+    const registryGone = await call("GET", `/api/devices/${deviceId}`);
+    check("the registry entry is gone", registryGone.status === 404, `got ${registryGone.status}`);
+
     // Pause and resume - the lifecycle a manager actually uses.
     const paused = await call("PUT", `/api/pipelines/${pipelineId}`, { enabled: false });
     check(

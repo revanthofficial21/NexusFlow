@@ -32,7 +32,7 @@ it turns a saved graph into a running pipeline.
 | `src/app.js` | Express app: CORS, body limits, routes, the JSON error envelope (malformed body → 400 JSON, oversized → 413). Exported without a listener so tests can mount it |
 | `src/config/db.js` | Connection, with `bufferCommands: false` so a dead database fails in milliseconds instead of ten seconds |
 | `src/config/timeseries.js` | Creates the `telemetry` collection (`timeField: timestamp`, `metaField: metadata`), applies retention with `collMod` when it changes |
-| `src/models/` | `Telemetry` (time-series), `Pipeline` (a saved graph), `Alert` (a rule match) |
+| `src/models/` | `Telemetry` (time-series), `Pipeline` (a saved graph), `Alert` (a rule match), `Device` (the registry: a name for a device id) |
 | `src/compiler/` | `validateGraph` (structure, cycles, node types), `graphCompiler` (graph → RxJS), `describeGraph` (the plan, without running) |
 | `src/streams/telemetryBus.js` | One shared `Subject`; ingest publishes, every rule subscribes |
 | `src/streams/ruleRegistry.js` | Which rules are live. Compiles on save, recompiles on update, stops on delete/pause, recompiles everything at boot |
@@ -54,6 +54,18 @@ which multicasts anyway).
 
 The returned stream is the merge of the graph's leaves, so a caller can still treat
 it as "the output of the pipeline".
+
+## Why devices have their own collection
+
+Telemetry carries `deviceId`, plus a type and location that arrive with every reading
+- so they are whatever the last payload claimed. A device that moves rooms, or a
+typo in one payload, would rewrite its own identity with no way to correct it.
+
+`Device` is the registry: one row per `deviceId`, with a name, location, type and
+notes, written through `PUT /api/devices/:id` as an upsert. It is deliberately not
+joined into the telemetry write path - ingest stays a single insert - and the UI
+merges the two when it renders. Deleting a registry entry leaves the history intact;
+retention owns that.
 
 ## Live versus dry run
 

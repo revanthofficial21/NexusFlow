@@ -952,3 +952,25 @@ body {
   color: #f59e0b;
   font-size: 12px;
 }
+
+/* Inline rename in the devices table */
+.rename-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rename-cell input {
+  width: 150px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: #0f172a;
+  color: #e2e8f0;
+  font-size: 12px;
+}
+
+.device-id {
+  margin: 2px 0 0;
+  font-size: 11px;
+}

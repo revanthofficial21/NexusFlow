@@ -313,6 +313,10 @@ a threshold and a raw alert, say), and a node with several inputs merges them. T
 parse endpoint reports `branches` - every node with more than one outgoing edge.
 | POST | `/api/compiler/execute` | Compile and run a graph against sample readings |
 | GET/POST/PUT/DELETE | `/api/pipelines` | Saved pipeline CRUD, each with a `running` flag |
+| GET | `/api/devices` | The registry: names and locations for device ids |
+| GET | `/api/devices/:deviceId` | One registry entry |
+| PUT | `/api/devices/:deviceId` | Create or rename (upsert) |
+| DELETE | `/api/devices/:deviceId` | Remove the entry, leaving telemetry alone |
 | GET | `/api/alerts` | Alert history, newest first; filters: `limit`, `ruleId`, `acknowledged` |
 | PATCH | `/api/alerts/:id/ack` | Acknowledge an alert |
 

@@ -457,6 +457,48 @@ const server = app.listen(0, async () => {
     assert.match(body.message, /limit of 2000/);
     console.log("Test 32 passed: the batch cap is enforced, not silently dropped");
 
+    // 25. Device registry: validation happens before the database is touched.
+    res = await fetch(`${base}/api/devices`);
+    assert.strictEqual(res.status, 503, "the list needs a database");
+    console.log("Test 33 passed: GET /api/devices fails closed without a database");
+
+    res = await fetch(`${base}/api/devices/turbine-01`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    body = await res.json();
+
+    assert.strictEqual(res.status, 400);
+    assert.match(body.message, /at least one of/);
+    console.log("Test 34 passed: an empty device update is rejected");
+
+    res = await fetch(`${base}/api/devices/turbine-01`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: 42 }),
+    });
+    body = await res.json();
+
+    assert.strictEqual(res.status, 400);
+    assert.match(body.message, /name must be a string/);
+    console.log("Test 35 passed: a non-string device name is rejected");
+
+    res = await fetch(`${base}/api/devices/turbine-01`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "x".repeat(200) }),
+    });
+    body = await res.json();
+
+    assert.strictEqual(res.status, 400);
+    assert.match(body.message, /at most 120/);
+    console.log("Test 36 passed: an over-long device name is rejected");
+
+    res = await fetch(`${base}/api/devices/turbine-01`);
+    assert.strictEqual(res.status, 503, "a single read needs a database too");
+    console.log("Test 37 passed: GET /api/devices/:id fails closed without a database");
+
     console.log("\nAll HTTP tests passed!");
   } catch (error) {
     console.error("HTTP test failed:", error.message);

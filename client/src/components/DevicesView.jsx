@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import DevicesPanel from "./DevicesPanel";
 
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -15,47 +15,100 @@ const timeAgo = (timestamp) => {
 };
 
 /**
- * Devices view: the per-device rollup as cards, plus who is actually reporting.
- * `onSelect` switches the live chart in the rule builder to that device.
+ * Devices view: who is reporting, and what they are called.
+ *
+ * The telemetry only carries a device id, so names come from the registry
+ * (GET /api/devices) and are editable here. Renaming writes to the registry, never
+ * to history.
  */
 export default function DevicesView({ onSelect }) {
   const [devices, setDevices] = useState([]);
+  const [registry, setRegistry] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  const [editing, setEditing] = useState(null);
+  const [draft, setDraft] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const [statusRes, registryRes] = await Promise.all([
+        fetch(`${BASE_URL}/api/telemetry/device-status`),
+        fetch(`${BASE_URL}/api/devices`),
+      ]);
+
+      if (!statusRes.ok) {
+        throw new Error(`the API answered ${statusRes.status}`);
+      }
+
+      const statusBody = await statusRes.json();
+      const registryBody = registryRes.ok ? await registryRes.json() : { devices: [] };
+
+      setDevices(statusBody.devices || []);
+      setRegistry(
+        Object.fromEntries(
+          (registryBody.devices || []).map((entry) => [entry.deviceId, entry])
+        )
+      );
+      setError("");
+    } catch (cause) {
+      setError(cause.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
 
-    const load = async () => {
-      try {
-        const response = await fetch(`${BASE_URL}/api/telemetry/device-status`);
-
-        if (!response.ok) {
-          throw new Error(`the API answered ${response.status}`);
-        }
-
-        const data = await response.json();
-
-        if (!cancelled) {
-          setDevices(data.devices || []);
-          setError("");
-        }
-      } catch (cause) {
-        if (!cancelled) setError(cause.message);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+    const run = async () => {
+      if (!cancelled) await load();
     };
 
-    load();
+    run();
 
-    const timer = setInterval(load, 15000);
+    const timer = setInterval(run, 15000);
 
     return () => {
       cancelled = true;
       clearInterval(timer);
     };
-  }, []);
+  }, [load]);
+
+  const startEditing = (deviceId) => {
+    setEditing(deviceId);
+    setDraft(registry[deviceId]?.name || "");
+  };
+
+  const saveName = async (deviceId) => {
+    setSaving(true);
+
+    try {
+      const response = await fetch(
+        `${BASE_URL}/api/devices/${encodeURIComponent(deviceId)}`,
+        {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ name: draft }),
+        }
+      );
+
+      const body = await response.json();
+
+      if (!response.ok) {
+        throw new Error(body?.message || `the API answered ${response.status}`);
+      }
+
+      setRegistry((previous) => ({ ...previous, [deviceId]: body.device }));
+      setEditing(null);
+      setError("");
+    } catch (cause) {
+      setError(cause.message);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const online = devices.filter((device) => device.status === "online").length;
 
@@ -70,7 +123,7 @@ export default function DevicesView({ onSelect }) {
         </div>
 
         {loading && <p className="muted">Loading devices…</p>}
-        {error && <p className="muted">Device status unavailable: {error}</p>}
+        {error && <p className="muted">Devices unavailable: {error}</p>}
 
         {!loading && !error && devices.length === 0 && (
           <p className="muted">
@@ -89,33 +142,82 @@ export default function DevicesView({ onSelect }) {
                 <th>Readings</th>
                 <th>Last seen</th>
                 <th>Status</th>
+                <th />
               </tr>
             </thead>
             <tbody>
-              {devices.map((device) => (
-                <tr key={device._id}>
-                  <td>
-                    <button className="link-button" onClick={() => onSelect?.(device._id)}>
-                      {device._id}
-                    </button>
-                  </td>
-                  <td>{device.deviceType || "-"}</td>
-                  <td>{device.location || "-"}</td>
-                  <td>{device.totalReadings ?? 0}</td>
-                  <td>{timeAgo(device.lastSeen)}</td>
-                  <td>
-                    <span
-                      className={
-                        device.status === "online"
-                          ? "dashboard-status running"
-                          : "dashboard-status paused"
-                      }
-                    >
-                      {device.status}
-                    </span>
-                  </td>
-                </tr>
-              ))}
+              {devices.map((device) => {
+                const entry = registry[device._id] || {};
+
+                return (
+                  <tr key={device._id}>
+                    <td>
+                      {editing === device._id ? (
+                        <span className="rename-cell">
+                          <input
+                            value={draft}
+                            onChange={(event) => setDraft(event.target.value)}
+                            placeholder="Name this device"
+                            aria-label={`name for ${device._id}`}
+                            maxLength={120}
+                          />
+                          <button
+                            className="ack-button"
+                            disabled={saving}
+                            onClick={() => saveName(device._id)}
+                          >
+                            {saving ? "Saving…" : "Save"}
+                          </button>
+                          <button
+                            className="link-button"
+                            onClick={() => setEditing(null)}
+                          >
+                            Cancel
+                          </button>
+                        </span>
+                      ) : (
+                        <>
+                          <button
+                            className="link-button"
+                            onClick={() => onSelect?.(device._id)}
+                            title="Chart this device"
+                          >
+                            {entry.name || device._id}
+                          </button>
+                          {entry.name && (
+                            <p className="muted device-id">{device._id}</p>
+                          )}
+                        </>
+                      )}
+                    </td>
+                    <td>{entry.deviceType || device.deviceType || "-"}</td>
+                    <td>{entry.location || device.location || "-"}</td>
+                    <td>{device.totalReadings ?? 0}</td>
+                    <td>{timeAgo(device.lastSeen)}</td>
+                    <td>
+                      <span
+                        className={
+                          device.status === "online"
+                            ? "dashboard-status running"
+                            : "dashboard-status paused"
+                        }
+                      >
+                        {device.status}
+                      </span>
+                    </td>
+                    <td>
+                      {editing !== device._id && (
+                        <button
+                          className="link-button"
+                          onClick={() => startEditing(device._id)}
+                        >
+                          Rename
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}
