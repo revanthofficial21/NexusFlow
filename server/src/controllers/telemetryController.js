@@ -21,7 +21,15 @@ function validatePoint(input) {
     return { errors: ["point must be an object"], point: null };
   }
 
-  const { deviceId, deviceType, location, temperature, humidity, pressure } = input;
+  const {
+    deviceId,
+    deviceType,
+    location,
+    temperature,
+    humidity,
+    pressure,
+    timestamp,
+  } = input;
 
   if (!deviceId || typeof deviceId !== "string") {
     errors.push("deviceId is required and must be a string");
@@ -33,6 +41,23 @@ function validatePoint(input) {
 
   if (location !== undefined && location !== null && typeof location !== "string") {
     errors.push("location must be a string");
+  }
+
+  // A device knows when it took the reading; the server clock is only a fallback.
+  // Without this, points arriving in one batch all shared the ingest millisecond and
+  // "the latest reading" was whichever the database happened to return first.
+  let readingTime = new Date();
+
+  if (timestamp !== undefined && timestamp !== null && timestamp !== "") {
+    const parsed = new Date(timestamp);
+
+    if (Number.isNaN(parsed.getTime())) {
+      errors.push("timestamp must be a valid date");
+    } else if (parsed.getTime() > Date.now() + 60_000) {
+      errors.push("timestamp cannot be in the future");
+    } else {
+      readingTime = parsed;
+    }
   }
 
   const readings = {};
@@ -61,7 +86,7 @@ function validatePoint(input) {
   return {
     errors: [],
     point: {
-      timestamp: new Date(),
+      timestamp: readingTime,
       metadata: {
         deviceId,
         deviceType,
@@ -386,7 +411,9 @@ async function getDeviceStatus(req, res) {
             lastSeen: { $max: "$timestamp" },
             totalReadings: { $sum: 1 },
             latestReadings: {
-              $top: { sortBy: { timestamp: -1 }, output: "$readings" },
+              // _id breaks ties: two readings can land in the same millisecond, and
+              // without it "latest" is whichever the engine returns first.
+              $top: { sortBy: { timestamp: -1, _id: -1 }, output: "$readings" },
             },
           },
         },

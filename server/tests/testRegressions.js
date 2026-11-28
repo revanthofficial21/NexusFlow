@@ -253,6 +253,36 @@ const badPressure = validatePoint({
 assert.ok(badPressure.errors.some((message) => message.includes("pressure")));
 console.log("Test 10e passed: a non-numeric pressure is rejected");
 
+// 10e-2. A device's own timestamp is kept, and nonsense is rejected -----------
+const past = new Date(Date.now() - 60_000).toISOString();
+const timed = validatePoint({
+  deviceId: "turbine-01",
+  deviceType: "temperature",
+  temperature: 20,
+  timestamp: past,
+});
+
+assert.deepStrictEqual(timed.errors, []);
+assert.strictEqual(timed.point.timestamp.toISOString(), past);
+console.log("Test 10e-2 passed: a device timestamp is kept as sent");
+
+const badTime = validatePoint({
+  deviceId: "turbine-01",
+  deviceType: "temperature",
+  temperature: 20,
+  timestamp: "sometime yesterday",
+});
+assert.ok(badTime.errors.some((message) => message.includes("timestamp")));
+
+const futureTime = validatePoint({
+  deviceId: "turbine-01",
+  deviceType: "temperature",
+  temperature: 20,
+  timestamp: "2099-01-01T00:00:00Z",
+});
+assert.ok(futureTime.errors.some((message) => message.includes("future")));
+console.log("Test 10e-3 passed: an unparseable or future timestamp is rejected");
+
 // 10f. A duplicated edge must not double every reading -----------------------
 const doubledPair = {
   nodes: [node("1", "sensor"), node("2", "alert")],

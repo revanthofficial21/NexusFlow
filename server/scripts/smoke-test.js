@@ -70,20 +70,25 @@ async function main() {
 
   // ---------------------------------------------------------------- telemetry
   console.log("\nTelemetry ingestion");
+  // Every point gets a timestamp derived from one captured instant, oldest first,
+  // so "the latest reading" is the same answer on a fast machine and a slow one.
+  const now = Date.now();
+
   const single = await call("POST", "/api/telemetry/ingest", {
     deviceId,
     deviceType: "temperature",
     location: "Smoke room",
     temperature: 28.5,
     humidity: 61,
+    timestamp: new Date(now - 10_000).toISOString(),
   });
   check("POST /api/telemetry/ingest returns 201", single.status === 201, `got ${single.status}`);
   check("ingest returns an insertedId", Boolean(single.body?.insertedId));
 
   const batch = await call("POST", "/api/telemetry/batch", [
-    { deviceId, deviceType: "temperature", temperature: 30.1 },
-    { deviceId, deviceType: "temperature", temperature: 31.4 },
-    { deviceId, deviceType: "temperature", humidity: 58 },
+    { deviceId, deviceType: "temperature", temperature: 30.1, timestamp: new Date(now - 3000).toISOString() },
+    { deviceId, deviceType: "temperature", temperature: 31.4, timestamp: new Date(now - 2000).toISOString() },
+    { deviceId, deviceType: "temperature", humidity: 58, timestamp: new Date(now - 1000).toISOString() },
   ]);
   check("POST /api/telemetry/batch returns 201", batch.status === 201, `got ${batch.status}`);
   check("batch reports 3 inserted", batch.body?.insertedCount === 3, `got ${batch.body?.insertedCount}`);
@@ -196,8 +201,8 @@ async function main() {
     const status = await call("GET", "/api/telemetry/device-status");
     const statusEntry = (status.body?.devices || []).find((device) => device._id === deviceId);
     check("device-status marks the device online", statusEntry?.status === "online");
-    // The last point in the batch is humidity-only, so the latest reading for this
-    // device has a null temperature and a humidity value.
+    // The newest point in the batch is humidity-only, so the latest reading for
+    // this device has a null temperature and a humidity value.
     check(
       "device-status carries the latest reading",
       statusEntry?.latestReadings?.humidity === 58,

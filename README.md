@@ -404,6 +404,26 @@ telemetry chart for the selected device (Socket.IO `telemetry`), a device rollup
 from `/api/telemetry/stats` where clicking a card switches the chart, and the alert
 feed with an All / Unacknowledged filter and per-alert acknowledge.
 
+### Ingest payload
+
+```json
+{
+  "deviceId": "turbine-01",
+  "deviceType": "temperature",
+  "location": "Plant A",
+  "temperature": 92.4,
+  "humidity": 48,
+  "pressure": 101.3,
+  "timestamp": "2026-11-28T09:15:00Z"
+}
+```
+
+`deviceId` and `deviceType` are required; at least one reading is required; every
+reading must be a finite number. `timestamp` is optional — a device should send its
+own, since the server clock is only a fallback, and a reading dated in the future is
+rejected. Without it, every point in one batch shares the ingest millisecond, which
+makes "the latest reading" ambiguous.
+
 ### Protecting the write path
 
 `POST /api/telemetry/ingest` and `/batch` accept data from hardware, so they can be
