@@ -11,7 +11,7 @@ const MAX_ALERTS = 20;
  * Live alerts are appended regardless of the filter - a new match is never
  * unacknowledged, so it always belongs in view.
  */
-export function useAlerts({ deviceId, acknowledged } = {}) {
+export function useAlerts({ deviceId, acknowledged, ruleId } = {}) {
   const [alerts, setAlerts] = useState([]);
   const [connected, setConnected] = useState(false);
 
@@ -19,6 +19,7 @@ export function useAlerts({ deviceId, acknowledged } = {}) {
     const params = new URLSearchParams({ limit: String(MAX_ALERTS) });
 
     if (acknowledged) params.set("acknowledged", acknowledged);
+    if (ruleId) params.set("ruleId", ruleId);
 
     try {
       const response = await fetch(`${BASE_URL}/api/alerts?${params}`);
@@ -30,7 +31,7 @@ export function useAlerts({ deviceId, acknowledged } = {}) {
     } catch {
       // History is a nicety; the live socket is what matters.
     }
-  }, [acknowledged]);
+  }, [acknowledged, ruleId]);
 
   // State is set only after the await, never synchronously in the effect body.
   useEffect(() => {
@@ -40,6 +41,7 @@ export function useAlerts({ deviceId, acknowledged } = {}) {
       const params = new URLSearchParams({ limit: String(MAX_ALERTS) });
 
       if (acknowledged) params.set("acknowledged", acknowledged);
+      if (ruleId) params.set("ruleId", ruleId);
 
       try {
         const response = await fetch(`${BASE_URL}/api/alerts?${params}`);
@@ -59,7 +61,7 @@ export function useAlerts({ deviceId, acknowledged } = {}) {
     return () => {
       cancelled = true;
     };
-  }, [acknowledged]);
+  }, [acknowledged, ruleId]);
 
   useEffect(() => {
     const socket = io(BASE_URL, { transports: ["websocket"] });
@@ -77,7 +79,7 @@ export function useAlerts({ deviceId, acknowledged } = {}) {
     if (deviceId) socket.emit("subscribe:device", { deviceId });
 
     return () => socket.disconnect();
-  }, [deviceId, acknowledged]);
+  }, [deviceId, acknowledged, ruleId]);
 
   /** Marks one alert acknowledged on the server, then locally. */
   const acknowledge = useCallback(

@@ -420,6 +420,13 @@ poll without the secret. `npm run gen` sends the header automatically when
 `INGEST_API_KEY` is in its environment. Left empty, writes are open and the server
 prints a warning at boot.
 
+### Documentation
+
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) - the two flows, module by module,
+  and why the compiler builds a DAG
+- [`docs/GRAPH_FORMAT.md`](docs/GRAPH_FORMAT.md) - the canvas/server contract: node
+  types, their parameters, and the rules both sides enforce
+
 ### See it running
 
 With MongoDB configured and the server started:

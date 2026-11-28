@@ -756,9 +756,24 @@ function App() {
               <h3>{pipelineName}</h3>
             </div>
 
+            {/* The real state of the selected rule, not a fixed label. */}
             <div className="pipeline-status">
-              <span className="status-dot"></span>
-              Draft Pipeline
+              <span
+                className={
+                  !selectedPipeline
+                    ? "status-dot"
+                    : selectedPipeline.enabled === false
+                    ? "status-dot paused"
+                    : "status-dot running"
+                }
+              />
+              {!selectedPipeline
+                ? "Draft pipeline"
+                : selectedPipeline.enabled === false
+                ? "Paused"
+                : "Running"}
+              {selectedPipeline?.suppressedAlerts > 0 &&
+                ` · ${selectedPipeline.suppressedAlerts} suppressed`}
             </div>
           </div>
 

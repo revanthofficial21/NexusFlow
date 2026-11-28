@@ -910,3 +910,23 @@ body {
 .link-button:hover {
   color: #7dd3fc;
 }
+
+/* Rule filter in the alerts view */
+.rule-filter {
+  margin-left: auto;
+  padding: 5px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: #0f172a;
+  color: #e2e8f0;
+  font-size: 12px;
+}
+
+/* Pipeline state dot */
+.status-dot.running {
+  background: #34d399;
+}
+
+.status-dot.paused {
+  background: #f59e0b;
+}

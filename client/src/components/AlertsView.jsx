@@ -1,18 +1,44 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAlerts } from "../hooks/useAlerts";
+
+const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 const when = (timestamp) =>
   timestamp ? new Date(timestamp).toLocaleString() : "-";
 
 /**
- * Alerts view: the full history, filterable and acknowledgeable. The sidebar
- * panel shows the newest few; this is the page you work through.
+ * Alerts view: the full history, filterable by state and by rule, acknowledgeable
+ * per row. The sidebar panel shows the newest few; this is the page you work
+ * through after an incident.
  */
 export default function AlertsView() {
-  const [filter, setFilter] = useState("");
+  const [stateFilter, setStateFilter] = useState("");
+  const [ruleFilter, setRuleFilter] = useState("");
+  const [rules, setRules] = useState([]);
+
   const { alerts, connected, acknowledge } = useAlerts({
-    acknowledged: filter || undefined,
+    acknowledged: stateFilter || undefined,
+    ruleId: ruleFilter || undefined,
   });
+
+  // Rule names come from the pipeline list; alerts only carry the id.
+  useEffect(() => {
+    let cancelled = false;
+
+    fetch(`${BASE_URL}/api/pipelines`)
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (cancelled) return;
+        setRules(data?.pipelines || []);
+      })
+      .catch(() => {
+        // The filter is a convenience; without it the list still works.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <div className="dashboard-page">
@@ -25,21 +51,38 @@ export default function AlertsView() {
         </div>
 
         <div className="alert-filters">
-          <button className={filter === "" ? "active" : ""} onClick={() => setFilter("")}>
+          <button
+            className={stateFilter === "" ? "active" : ""}
+            onClick={() => setStateFilter("")}
+          >
             All
           </button>
           <button
-            className={filter === "false" ? "active" : ""}
-            onClick={() => setFilter("false")}
+            className={stateFilter === "false" ? "active" : ""}
+            onClick={() => setStateFilter("false")}
           >
             Unacknowledged
           </button>
           <button
-            className={filter === "true" ? "active" : ""}
-            onClick={() => setFilter("true")}
+            className={stateFilter === "true" ? "active" : ""}
+            onClick={() => setStateFilter("true")}
           >
             Acknowledged
           </button>
+
+          <select
+            className="rule-filter"
+            value={ruleFilter}
+            onChange={(event) => setRuleFilter(event.target.value)}
+            aria-label="filter by rule"
+          >
+            <option value="">Every rule</option>
+            {rules.map((rule) => (
+              <option key={rule._id} value={rule._id}>
+                {rule.name}
+              </option>
+            ))}
+          </select>
         </div>
 
         {alerts.length === 0 ? (
@@ -68,7 +111,10 @@ export default function AlertsView() {
                     {alert.acknowledged ? (
                       <span className="muted">acknowledged</span>
                     ) : (
-                      <button className="ack-button" onClick={() => acknowledge(alert)}>
+                      <button
+                        className="ack-button"
+                        onClick={() => acknowledge(alert)}
+                      >
                         Acknowledge
                       </button>
                     )}
