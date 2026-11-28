@@ -1,9 +1,5 @@
+﻿const mongoose = require("mongoose");
 
-const mongoose = require("mongoose");
-
-// Throws instead of calling process.exit: exiting from inside a library
-// function makes the caller's error handling dead code and kills any test that
-// imports it.
 const connectDB = async () => {
   const mongoURI = process.env.MONGODB_URI;
 
@@ -13,8 +9,6 @@ const connectDB = async () => {
 
   try {
     await mongoose.connect(mongoURI, {
-      // Without this a request waits the full 10s buffer timeout when Mongo is
-      // unreachable, instead of failing immediately.
       bufferCommands: false,
       serverSelectionTimeoutMS: 5000,
     });
@@ -24,6 +18,34 @@ const connectDB = async () => {
 
   console.log("MongoDB connected successfully!");
   console.log("Database:", mongoose.connection.name);
+
+  const retentionSeconds = 7776000;
+  const db = mongoose.connection.db;
+
+  const telemetryCollection = await db
+    .listCollections({ name: "telemetry" })
+    .next();
+
+  if (!telemetryCollection) {
+    await db.createCollection("telemetry", {
+      timeseries: {
+        timeField: "timestamp",
+        metaField: "metadata",
+      },
+      expireAfterSeconds: retentionSeconds,
+    });
+    console.log("Telemetry 90-day retention enabled!");
+  } else if (
+    telemetryCollection.options.expireAfterSeconds !== retentionSeconds
+  ) {
+    await db.command({
+      collMod: "telemetry",
+      expireAfterSeconds: retentionSeconds,
+    });
+    console.log("Telemetry 90-day retention updated!");
+  } else {
+    console.log("Telemetry 90-day retention already enabled!");
+  }
 
   return mongoose.connection;
 };
