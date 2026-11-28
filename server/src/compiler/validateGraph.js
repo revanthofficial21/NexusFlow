@@ -53,10 +53,21 @@ function validateGraph(graph) {
     }
   });
 
+  const seenEdgeIds = new Set();
+
   edges.forEach((edge, index) => {
     if (!edge.source || !edge.target) {
       errors.push(`Edge at index ${index} needs source and target`);
       return;
+    }
+
+    // A repeated edge id makes the graph ambiguous, and a node that receives the
+    // same connection twice would process every value twice.
+    if (edge.id !== undefined) {
+      if (seenEdgeIds.has(edge.id)) {
+        errors.push(`Duplicate edge ID: ${edge.id}`);
+      }
+      seenEdgeIds.add(edge.id);
     }
 
     if (!nodeIds.has(edge.source)) {

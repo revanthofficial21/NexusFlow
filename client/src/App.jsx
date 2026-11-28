@@ -209,6 +209,9 @@ function App() {
 
       if (result.pipeline?._id) {
         setSelectedPipelineId(result.pipeline._id);
+        // Without this the bar kept saying 'Draft pipeline' for a rule that was
+        // saved and already running.
+        setSelectedPipeline(result.pipeline);
       }
 
       await fetchSavedPipelines();
@@ -297,13 +300,16 @@ function App() {
 
       const serialized = serializeGraph(graph.nodes, graph.edges);
 
-      await updatePipeline(selectedPipelineId, {
+      const result = await updatePipeline(selectedPipelineId, {
         name: pipelineName.trim(),
         description: pipelineDescription,
         nodes: serialized.nodes,
         edges: serialized.edges,
       });
 
+      // Keep the selected rule in step, so the status bar and the Pause / Resume
+      // label reflect what the server just stored.
+      setSelectedPipeline(result?.pipeline || null);
       setPipelineMessage("Pipeline updated successfully!");
 
       await fetchSavedPipelines();

@@ -277,7 +277,17 @@ function analyseGraph(graph) {
   const incoming = new Map(nodes.map((node) => [node.id, []]));
   const outgoing = new Map(nodes.map((node) => [node.id, []]));
 
+  // One connection per pair. Two edges from the same source to the same target
+  // would merge the same stream twice and fire every action twice per reading,
+  // which is what a duplicated edge in a hand-written graph produced.
+  const seenPairs = new Set();
+
   for (const edge of edges) {
+    const pair = `${edge.source}->${edge.target}`;
+
+    if (seenPairs.has(pair)) continue;
+
+    seenPairs.add(pair);
     incoming.get(edge.target)?.push(edge);
     outgoing.get(edge.source)?.push(edge);
   }

@@ -253,6 +253,35 @@ const badPressure = validatePoint({
 assert.ok(badPressure.errors.some((message) => message.includes("pressure")));
 console.log("Test 10e passed: a non-numeric pressure is rejected");
 
+// 10f. A duplicated edge must not double every reading -----------------------
+const doubledPair = {
+  nodes: [node("1", "sensor"), node("2", "alert")],
+  edges: [
+    { id: "e1", source: "1", target: "2" },
+    { id: "e2", source: "1", target: "2" },
+  ],
+};
+
+const doubledAlerts = [];
+compileGraph(doubledPair, of(10, 20), {
+  onAlert: (alert) => doubledAlerts.push(alert.value),
+}).subscribe();
+
+assert.deepStrictEqual(doubledAlerts, [10, 20], "a duplicated pair must fire once");
+console.log("Test 10f passed: the same connection twice delivers each reading once");
+
+const sameEdgeId = {
+  nodes: [node("1", "sensor"), node("2", "alert")],
+  edges: [
+    { id: "e1", source: "1", target: "2" },
+    { id: "e1", source: "1", target: "2" },
+  ],
+};
+
+assert.strictEqual(validateGraph(sameEdgeId).valid, false);
+assert.match(validateGraph(sameEdgeId).errors.join(" "), /Duplicate edge ID/);
+console.log("Test 10g passed: a duplicated edge id is rejected");
+
 // 11. The compiler needs a real stream --------------------------------------
 expectThrow(
   () => compileGraph(cleared),
