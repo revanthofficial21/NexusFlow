@@ -4,10 +4,13 @@ const { telemetryStream } = require("./telemetryBus");
 const { createAlertThrottle } = require("./alertThrottle");
 const { createActivityGate } = require("./activityGate");
 
-const ALERT_COOLDOWN_MS = Number(process.env.ALERT_COOLDOWN_MS || 30000);
-const EDGE_ACTIVITY_INTERVAL_MS = Number(
-  process.env.EDGE_ACTIVITY_INTERVAL_MS || 100
-);
+const { envInt } = require("../config/env");
+
+const ALERT_COOLDOWN_MS = envInt("ALERT_COOLDOWN_MS", 30000, { min: 0, max: 3600000 });
+const EDGE_ACTIVITY_INTERVAL_MS = envInt("EDGE_ACTIVITY_INTERVAL_MS", 100, {
+  min: 0,
+  max: 60000,
+});
 
 /**
  * Live pipelines: one subscription per saved rule, fed by the telemetry bus.

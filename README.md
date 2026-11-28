@@ -420,6 +420,26 @@ poll without the secret. `npm run gen` sends the header automatically when
 `INGEST_API_KEY` is in its environment. Left empty, writes are open and the server
 prints a warning at boot.
 
+### Environment variables
+
+Numeric settings are parsed defensively: a typo falls back to the default and logs
+which variable was ignored, rather than becoming `NaN`. That matters more than it
+sounds - `NaN` makes every comparison false, so a mistyped `INGEST_BATCH_LIMIT` used
+to remove the batch cap entirely instead of failing loudly.
+
+| Variable | Default | Effect |
+| --- | --- | --- |
+| `PORT` | 5000 | HTTP + Socket.IO port |
+| `MONGODB_URI` | - | required |
+| `CLIENT_ORIGIN` | both loopback spellings | CORS allowlist, comma separated |
+| `INGEST_API_KEY` | empty | when set, writes need `x-api-key` |
+| `INGEST_BATCH_LIMIT` | 2000 | max points per `/batch` call |
+| `EXPORT_MAX_ROWS` | 10000 | max rows in a CSV export |
+| `TELEMETRY_RETENTION_DAYS` | 30 | time-series TTL, applied at creation and via `collMod` |
+| `ALERT_COOLDOWN_MS` | 30000 | minimum gap between two alerts from one rule |
+| `EDGE_ACTIVITY_INTERVAL_MS` | 100 | minimum gap between edge-activity events per wire |
+| `SMS_PROVIDER` | `log` | `log` records, `fail` simulates an outage |
+
 ### Requirements
 
 Node 20+ and MongoDB **5.2+** (the device-status rollup uses `$top`, added in 5.2).

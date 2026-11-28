@@ -1,8 +1,9 @@
 const mongoose = require("mongoose");
 
-const RETENTION_SECONDS = Number(
-  process.env.TELEMETRY_RETENTION_DAYS || 30
-) * 24 * 60 * 60;
+const { envInt } = require("./env");
+
+const RETENTION_DAYS = envInt("TELEMETRY_RETENTION_DAYS", 30, { min: 1, max: 3650 });
+const RETENTION_SECONDS = RETENTION_DAYS * 24 * 60 * 60;
 
 /**
  * Mongo will not infer a time-series collection from a schema, so it is created

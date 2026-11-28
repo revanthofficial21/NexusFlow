@@ -1,8 +1,9 @@
 const mongoose = require("mongoose");
 
-const RETENTION_SECONDS = Number(
-  process.env.TELEMETRY_RETENTION_DAYS || 30
-) * 24 * 60 * 60;
+const { envInt } = require("../config/env");
+
+const RETENTION_SECONDS =
+  envInt("TELEMETRY_RETENTION_DAYS", 30, { min: 1, max: 3650 }) * 24 * 60 * 60;
 
 /**
  * Append-only sensor data.

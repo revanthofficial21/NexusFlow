@@ -13,7 +13,9 @@ const { telemetryStream } = require("./streams/telemetryBus");
 const { initSocket } = require("./realtime/socket");
 const { AlertService } = require("./services/alertService");
 
-const PORT = process.env.PORT || 5000;
+const { envInt } = require("./config/env");
+
+const PORT = envInt("PORT", 5000, { min: 1, max: 65535 });
 
 const startServer = async () => {
   try {

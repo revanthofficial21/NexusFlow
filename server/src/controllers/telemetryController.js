@@ -5,7 +5,9 @@ const {
   respondDatabaseUnavailable,
 } = require("../utils/dbError");
 
-const MAX_BATCH = Number(process.env.INGEST_BATCH_LIMIT || 2000);
+const { envInt } = require("../config/env");
+
+const MAX_BATCH = envInt("INGEST_BATCH_LIMIT", 2000, { min: 1, max: 50000 });
 
 /**
  * Readings used to be accepted as anything and stored as-is, so a string
@@ -450,7 +452,7 @@ async function exportTelemetryCSV(req, res) {
     });
   }
 
-  const maxRows = Number(process.env.EXPORT_MAX_ROWS || 10000);
+  const maxRows = envInt("EXPORT_MAX_ROWS", 10000, { min: 1, max: 100000 });
 
   try {
     const query = {};

@@ -437,6 +437,26 @@ const server = app.listen(0, async () => {
 
     delete process.env.INGEST_API_KEY;
 
+    // 24. A mistyped limit falls back to the default instead of vanishing.
+    // The cap is read at module load, so this asserts the default of 2000 is in
+    // force; testEnv.js covers the parsing itself.
+    res = await fetch(`${base}/api/telemetry/batch`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(
+        Array.from({ length: 2500 }, (_, index) => ({
+          deviceId: "turbine-01",
+          deviceType: "temperature",
+          temperature: index,
+        }))
+      ),
+    });
+    body = await res.json();
+
+    assert.strictEqual(res.status, 413);
+    assert.match(body.message, /limit of 2000/);
+    console.log("Test 32 passed: the batch cap is enforced, not silently dropped");
+
     console.log("\nAll HTTP tests passed!");
   } catch (error) {
     console.error("HTTP test failed:", error.message);
