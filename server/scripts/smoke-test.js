@@ -196,6 +196,18 @@ async function main() {
     const status = await call("GET", "/api/telemetry/device-status");
     const statusEntry = (status.body?.devices || []).find((device) => device._id === deviceId);
     check("device-status marks the device online", statusEntry?.status === "online");
+    // The last point in the batch is humidity-only, so the latest reading for this
+    // device has a null temperature and a humidity value.
+    check(
+      "device-status carries the latest reading",
+      statusEntry?.latestReadings?.humidity === 58,
+      `got ${JSON.stringify(statusEntry?.latestReadings)}`
+    );
+    check(
+      "device-status reports the total reading count",
+      status.body?.totalReadings >= 4,
+      `got ${status.body?.totalReadings}`
+    );
 
     const exported = await call("GET", `/api/telemetry/export?deviceId=${deviceId}`);
     check(

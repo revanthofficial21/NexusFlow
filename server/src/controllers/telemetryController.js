@@ -372,17 +372,25 @@ async function getDeviceStatus(req, res) {
 
   try {
     // $max rather than a leading $sort: same answer, one pass instead of two.
-    const devices = await Telemetry.aggregate([
-      {
-        $group: {
-          _id: "$metadata.deviceId",
-          deviceType: { $first: "$metadata.deviceType" },
-          location: { $first: "$metadata.location" },
-          lastSeen: { $max: "$timestamp" },
-          totalReadings: { $sum: 1 },
+    // $top picks the whole latest document per device, which is what the device
+    // cards need to show the current reading rather than only the last timestamp.
+    const [devices, totalReadings] = await Promise.all([
+      Telemetry.aggregate([
+        {
+          $group: {
+            _id: "$metadata.deviceId",
+            deviceType: { $first: "$metadata.deviceType" },
+            location: { $first: "$metadata.location" },
+            lastSeen: { $max: "$timestamp" },
+            totalReadings: { $sum: 1 },
+            latestReadings: {
+              $top: { sortBy: { timestamp: -1 }, output: "$readings" },
+            },
+          },
         },
-      },
-      { $sort: { lastSeen: -1 } },
+        { $sort: { lastSeen: -1 } },
+      ]),
+      Telemetry.countDocuments(),
     ]);
 
     const data = devices.map((device) => ({
@@ -393,6 +401,7 @@ async function getDeviceStatus(req, res) {
     return res.status(200).json({
       success: true,
       windowMinutes: minutes,
+      totalReadings,
       onlineCount: data.filter((device) => device.status === "online").length,
       offlineCount: data.filter((device) => device.status === "offline").length,
       devices: data,

@@ -19,35 +19,10 @@ const connectDB = async () => {
   console.log("MongoDB connected successfully!");
   console.log("Database:", mongoose.connection.name);
 
-  const retentionSeconds = 7776000;
-  const db = mongoose.connection.db;
-
-  const telemetryCollection = await db
-    .listCollections({ name: "telemetry" })
-    .next();
-
-  if (!telemetryCollection) {
-    await db.createCollection("telemetry", {
-      timeseries: {
-        timeField: "timestamp",
-        metaField: "metadata",
-      },
-      expireAfterSeconds: retentionSeconds,
-    });
-    console.log("Telemetry 90-day retention enabled!");
-  } else if (
-    telemetryCollection.options.expireAfterSeconds !== retentionSeconds
-  ) {
-    await db.command({
-      collMod: "telemetry",
-      expireAfterSeconds: retentionSeconds,
-    });
-    console.log("Telemetry 90-day retention updated!");
-  } else {
-    console.log("Telemetry 90-day retention already enabled!");
-  }
-
-  return mongoose.connection;
+  // Collection creation and retention live in config/timeseries.js: one owner for
+  // the time-series options, reading TELEMETRY_RETENTION_DAYS. This function used to
+  // do the same job with a hardcoded 90 days, so two paths raced to create the same
+  // collection and the env var was honoured by only one of them.
 };
 
 module.exports = connectDB;

@@ -303,7 +303,7 @@ cd client && npm run dev
 | POST | `/api/telemetry/batch` | Ingest up to 2000 readings |
 | GET | `/api/telemetry/latest` | Latest readings; filters: `deviceId`, `startDate`, `endDate`, `limit` |
 | GET | `/api/telemetry/history` | Paginated readings: `page`, `limit`, `deviceId` |
-| GET | `/api/telemetry/device-status` | Online/offline per device: `minutes` window |
+| GET | `/api/telemetry/device-status` | Online/offline per device, its latest readings, and the total reading count: `minutes` window |
 | GET | `/api/telemetry/export` | CSV download: `deviceId`, `startDate`, `endDate` |
 | GET | `/api/telemetry/stats` | Per-device rollup: readings, avg/max temperature and humidity, last seen |
 | POST | `/api/compiler/parse` | Validate a graph and report the execution plan, without running it |
@@ -419,6 +419,11 @@ time. Reads (`latest`, `history`, `stats`, `export`) stay open, so a dashboard c
 poll without the secret. `npm run gen` sends the header automatically when
 `INGEST_API_KEY` is in its environment. Left empty, writes are open and the server
 prints a warning at boot.
+
+### Requirements
+
+Node 20+ and MongoDB **5.2+** (the device-status rollup uses `$top`, added in 5.2).
+The time-series collections themselves need 5.0+.
 
 ### Documentation
 
