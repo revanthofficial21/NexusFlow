@@ -16,8 +16,10 @@ import {
 import "@xyflow/react/dist/style.css";
 
 import { NODE_LIBRARY } from "./nodeLibrary";
+import { findNodeWarnings } from "../../services/graphWarnings";
 
 const nodeStyle = {
+  position: "relative",
   borderRadius: "12px",
   padding: "15px",
   minWidth: "165px",
@@ -26,10 +28,26 @@ const nodeStyle = {
   border: "1px solid #475569",
 };
 
+// A node that would fail validation says so on the canvas, instead of only after a
+// save comes back with a 400.
+function WarningBadge({ message }) {
+  if (!message) return null;
+
+  return (
+    <span className="node-warning-badge" title={message}>
+      !
+    </span>
+  );
+}
+
+const warnedStyle = (warning) =>
+  warning ? { ...nodeStyle, outline: "2px solid #f59e0b", outlineOffset: "2px" } : nodeStyle;
+
 // Sensor Node
 function SensorNode({ data }) {
   return (
-    <div style={{ ...nodeStyle, background: "#1d4ed8" }}>
+    <div style={{ ...warnedStyle(data.__warning), background: "#1d4ed8" }}>
+      <WarningBadge message={data.__warning} />
       <Handle type="source" position={Position.Right} />
       <div>🌡️ Data Source</div>
       <small>{data.label}</small>
@@ -41,7 +59,8 @@ function SensorNode({ data }) {
 // Moving Average Node
 function MovingAverageNode({ data }) {
   return (
-    <div style={{ ...nodeStyle, background: "#7c3aed" }}>
+    <div style={{ ...warnedStyle(data.__warning), background: "#7c3aed" }}>
+      <WarningBadge message={data.__warning} />
       <Handle type="target" position={Position.Left} />
       <Handle type="source" position={Position.Right} />
       <div>📊 Moving Average</div>
@@ -53,7 +72,8 @@ function MovingAverageNode({ data }) {
 // Threshold Node
 function ThresholdNode({ data }) {
   return (
-    <div style={{ ...nodeStyle, background: "#b45309" }}>
+    <div style={{ ...warnedStyle(data.__warning), background: "#b45309" }}>
+      <WarningBadge message={data.__warning} />
       <Handle type="target" position={Position.Left} />
       <Handle type="source" position={Position.Right} />
       <div>⚙️ Threshold</div>
@@ -66,7 +86,8 @@ function ThresholdNode({ data }) {
 // Webhook Node
 function WebhookNode({ data }) {
   return (
-    <div style={{ ...nodeStyle, background: "#9333ea" }}>
+    <div style={{ ...warnedStyle(data.__warning), background: "#9333ea" }}>
+      <WarningBadge message={data.__warning} />
       <Handle type="target" position={Position.Left} />
       <div>🔗 Webhook</div>
       <small>{data.label}</small>
@@ -78,7 +99,8 @@ function WebhookNode({ data }) {
 // SMS Node
 function SmsNode({ data }) {
   return (
-    <div style={{ ...nodeStyle, background: "#047857" }}>
+    <div style={{ ...warnedStyle(data.__warning), background: "#047857" }}>
+      <WarningBadge message={data.__warning} />
       <Handle type="target" position={Position.Left} />
       <div>📱 SMS</div>
       <small>{data.label}</small>
@@ -90,9 +112,10 @@ function SmsNode({ data }) {
 // Alert Node
 function AlertNode({ data }) {
   return (
-    <div style={{ ...nodeStyle, background: "#be123c" }}>
+    <div style={{ ...warnedStyle(data.__warning), background: "#be123c" }}>
       <Handle type="target" position={Position.Left} />
-      <div>🚨 SMS Alert</div>
+      <WarningBadge message={data.__warning} />
+      <div>🚨 Alert</div>
       <small>{data.label}</small>
     </div>
   );
@@ -344,6 +367,19 @@ export default function FlowCanvas({
     setSelectedNodeId(null);
   };
 
+  // Derived, display-only: nodes that would fail validation are flagged while you
+  // build, rather than after a save comes back rejected. State is untouched - the
+  // warning rides on the copy handed to React Flow.
+  const nodeWarnings = findNodeWarnings(nodes, edges);
+
+  const renderedNodes = nodes.map((node) =>
+    nodeWarnings[node.id]
+      ? { ...node, data: { ...node.data, __warning: nodeWarnings[node.id] } }
+      : node
+  );
+
+  const warningCount = Object.keys(nodeWarnings).length;
+
   // Derived, display-only: a wire that carried data in the last second is drawn
   // brighter and animated. The underlying edge state is untouched.
   const styledEdges = edges.map((edge) => {
@@ -575,6 +611,11 @@ export default function FlowCanvas({
         <div className="canvas-toolbar">
           <span>{nodes.length} Nodes</span>
           <span>{edges.length} Connections</span>
+          {warningCount > 0 && (
+            <span className="canvas-warning">
+              {warningCount} need{warningCount === 1 ? "s" : ""} attention
+            </span>
+          )}
 
           <button onClick={resetCanvas}>
             Reset Canvas
@@ -583,7 +624,7 @@ export default function FlowCanvas({
 
         <div className="flow-canvas">
           <ReactFlow
-            nodes={nodes}
+            nodes={renderedNodes}
             edges={styledEdges}
             nodeTypes={nodeTypes}
             onNodesChange={onNodesChange}

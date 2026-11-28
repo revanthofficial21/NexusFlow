@@ -465,6 +465,17 @@ to remove the batch cap entirely instead of failing loudly.
 Node 20+ and MongoDB **5.2+** (the device-status rollup uses `$top`, added in 5.2).
 The time-series collections themselves need 5.0+.
 
+### Canvas warnings
+
+The canvas flags a node that would fail validation while you build, instead of
+letting you find out from a 400 on save: a node with no input, a source with nothing
+downstream, an action node with an output, a webhook URL that is not http(s), a phone
+number that is too short, a window size out of range. The toolbar shows how many need
+attention, and the reason is the badge's tooltip.
+
+The rules live in `client/src/services/graphWarnings.js` and mirror the server's
+validator; `npm test` in `client/` covers them.
+
 ### Documentation
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) - the two flows, module by module,
