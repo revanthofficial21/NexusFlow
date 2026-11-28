@@ -1,4 +1,4 @@
-﻿const connectDB = require("../db");
+const connectDB = require("../db");
 
 async function receiveTelemetry(req, res) {
   try {
@@ -75,4 +75,75 @@ async function getDeviceSummary(req, res) {
   }
 }
 
-module.exports = { receiveTelemetry, getDeviceSummary };
+
+async function getDeviceAnalytics(req, res) {
+  try {
+    const { deviceId } = req.params;
+    const { from, to } = req.query;
+
+    if (!deviceId) {
+      return res.status(400).json({ success: false, message: "Device ID is required" });
+    }
+
+    const match = { "metadata.deviceId": deviceId };
+
+    if (from || to) {
+      match.timestamp = {};
+      if (from) {
+        const startDate = new Date(from);
+        if (Number.isNaN(startDate.getTime())) {
+          return res.status(400).json({ success: false, message: "Invalid from date" });
+        }
+        match.timestamp.$gte = startDate;
+      }
+      if (to) {
+        const endDate = new Date(to);
+        if (Number.isNaN(endDate.getTime())) {
+          return res.status(400).json({ success: false, message: "Invalid to date" });
+        }
+        match.timestamp.$lte = endDate;
+      }
+      if (match.timestamp.$gte && match.timestamp.$lte &&
+          match.timestamp.$gte > match.timestamp.$lte) {
+        return res.status(400).json({ success: false, message: "From date must be before to date" });
+      }
+    }
+
+    const db = await connectDB();
+    const analytics = await db.collection("telemetry").aggregate([
+      { $match: match },
+      { $sort: { timestamp: 1 } },
+      {
+        $group: {
+          _id: "$metadata.deviceId",
+          totalReadings: { $sum: 1 },
+          averageTemperature: { $avg: "$readings.temperature" },
+          minimumTemperature: { $min: "$readings.temperature" },
+          maximumTemperature: { $max: "$readings.temperature" },
+          averageHumidity: { $avg: "$readings.humidity" },
+          minimumHumidity: { $min: "$readings.humidity" },
+          maximumHumidity: { $max: "$readings.humidity" },
+          firstReading: { $first: "$timestamp" },
+          latestReading: { $last: "$timestamp" }
+        }
+      }
+    ]).toArray();
+
+    if (!analytics.length) {
+      return res.status(404).json({
+        success: false,
+        message: "No telemetry readings found for this device"
+      });
+    }
+
+    return res.json({ success: true, analytics: analytics[0] });
+  } catch (error) {
+    console.error("Device analytics error:", error.message);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch device analytics"
+    });
+  }
+}
+
+module.exports = { receiveTelemetry, getDeviceSummary, getDeviceAnalytics };
