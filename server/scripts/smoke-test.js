@@ -14,15 +14,34 @@ let passed = 0;
 let failed = 0;
 const failures = [];
 
+// The response the last call() produced, so a failing check can show what the
+// server actually answered instead of only that a boolean was false.
+let lastCall = null;
+
+function describeLastCall() {
+  if (!lastCall) return "";
+
+  const body =
+    typeof lastCall.body === "object" && lastCall.body !== null
+      ? JSON.stringify(lastCall.body)
+      : String(lastCall.raw || "");
+
+  return `${lastCall.method} ${lastCall.path} -> ${lastCall.status} ${body.slice(0, 300)}`;
+}
+
 function check(label, condition, detail) {
   if (condition) {
     passed += 1;
     console.log(`  PASS  ${label}`);
-  } else {
-    failed += 1;
-    failures.push(`${label}${detail ? ` -> ${detail}` : ""}`);
-    console.log(`  FAIL  ${label}${detail ? ` -> ${detail}` : ""}`);
+    return;
   }
+
+  failed += 1;
+
+  // Always show what came back: a bare 'got 200' costs another CI run to explain.
+  const context = detail || describeLastCall();
+  failures.push(`${label}${context ? ` -> ${context}` : ""}`);
+  console.log(`  FAIL  ${label}${context ? ` -> ${context}` : ""}`);
 }
 
 async function call(method, path, body) {
@@ -49,6 +68,8 @@ async function call(method, path, body) {
   }
 
   // CSV responses have no JSON body; keep the raw text so they can be checked.
+  lastCall = { method, path, status: res.status, body: payload, raw: text };
+
   return { status: res.status, body: payload, raw: text };
 }
 
